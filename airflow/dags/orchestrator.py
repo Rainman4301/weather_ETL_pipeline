@@ -26,7 +26,7 @@ default_args = {
 dag = DAG(
     dag_id='weather_api_dbt_orchestrator',
     default_args=default_args,
-    schedule=timedelta(minutes=1)
+    schedule=timedelta(minutes=5)
 )
 
 with dag:

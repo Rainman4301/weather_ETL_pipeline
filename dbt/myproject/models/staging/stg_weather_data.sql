@@ -33,4 +33,6 @@ select
     (inserted_at + (utc_offset || 'hours')::interval) as inserted_at_local
 from de_dup
 where rn = 1
+order by inserted_at desc
+limit 2000
 
