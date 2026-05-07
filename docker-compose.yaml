@@ -25,6 +25,7 @@ services:
       - ./postgres/data:/var/lib/postgresql/data
       - ./postgres/airflow_init.sql:/docker-entrypoint-initdb.d/airflow_init.sql
       - ./postgres/superset_init.sql:/docker-entrypoint-initdb.d/superset_init.sql
+      - ./postgres/all_roles_configuration.sql:/docker-entrypoint-initdb.d/all_roles_configuration.sql 
     networks:
       - my-network
 

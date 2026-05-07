@@ -132,6 +132,19 @@ WEBDRIVER_BASEURL_USER_FRIENDLY = (
 )
 SQLLAB_CTAS_NO_LIMIT = True
 
+# ========================================================
+# ── Public Access & Role Permissions ───────────────────
+PUBLIC_ROLE_LIKE = "Gamma"          # Public role inherits Gamma permissions
+AUTH_ROLE_PUBLIC = "Public"         # Unauthenticated users get the Public role
+AUTH_ROLE_ADMIN = "Admin"           # Keep this as is
+ENABLE_USER_REGISTRATION = False    # Prevent unauthorized signups
+
+SUPERSET_WEBSERVER_TIMEOUT = 60     # seconds
+SQL_MAX_ROW = 10000                 # cap result rows
+SQLLAB_ALLOWS_CTAS = False          # no Create Table As Select
+SQLLAB_ALLOWS_DML = False           # no INSERT/UPDATE/DELETE
+# ========================================================
+
 log_level_text = os.getenv("SUPERSET_LOG_LEVEL", "INFO")
 LOG_LEVEL = getattr(logging, log_level_text.upper(), logging.INFO)
 
