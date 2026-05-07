@@ -1,0 +1,53 @@
+version: 2
+
+models:
+  - name: weather_report
+    description: "Detailed weather forecast data for all cities. Contains hourly forecast records and recent historical data within the last 12 hours."
+    columns:
+      - name: id
+        description: "Unique record identifier from raw_weather_data"
+        tests:
+          - unique
+          - not_null
+      - name: city
+        description: "City name"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['London', 'New York', 'Tokyo', 'Paris', 'Sydney', 'Berlin', 'Toronto', 'Mumbai', 'Dubai', 'Singapore']
+      - name: temperature
+        description: "Temperature in Celsius. Range -50 to 60°C"
+        tests:
+          - not_null
+      - name: weather_description
+        description: "Weather condition description (e.g., Clear, Cloudy, Rainy, Snowy, etc.)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Clear', 'Cloudy', 'Rainy', 'Snowy', 'Sunny', 'Foggy', 'Windy', 'Partly Cloudy', 'Thunderstorm', 'Drizzle', 'Hail', 'Sleet']
+      - name: wind_speed
+        description: "Wind speed in km/h. Range 0-25 km/h"
+        tests:
+          - not_null
+      - name: humidity
+        description: "Humidity percentage. Range 0-100%"
+        tests:
+          - not_null
+      - name: pressure
+        description: "Atmospheric pressure in hPa. Range 1000-1025 hPa"
+        tests:
+          - not_null
+      - name: weather_time_utc
+        description: "Forecast/observation time in UTC timezone"
+        tests:
+          - not_null
+      - name: weather_time_local
+        description: "Forecast/observation time in city's local timezone"
+        tests:
+          - not_null
+      - name: is_forecast
+        description: "TRUE if this is forecast data, FALSE if historical data"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]

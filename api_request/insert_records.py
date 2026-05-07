@@ -41,9 +41,12 @@ def create_table(conn):
                 temperature FLOAT,
                 weather_description TEXT,
                 wind_speed FLOAT,
+                humidity FLOAT,
+                pressure FLOAT,
                 time TIMESTAMP,
                 inserted_at TIMESTAMP DEFAULT NOW(),
-                utc_offset TEXT
+                utc_offset TEXT,
+                is_forecast BOOLEAN DEFAULT TRUE
             );
 
             """)
@@ -65,49 +68,66 @@ def create_table(conn):
 
 
 
-def generate_random_weather_data(num_records=2000, days_back=14):
+def generate_random_weather_data(days_ahead=7):
     """
-    Generate random weather data for the past N days.
+    Generate future weather forecast data for the next N days.
+    Creates one hourly entry per city at the top of each hour (00 minutes, 00 seconds).
     
     Args:
-        num_records (int): Number of random records to generate (default: 2000)
-        days_back (int): Number of days back to generate data for (default: 14)
+        days_ahead (int): Number of days ahead to generate forecast for (default: 7)
     
     Returns:
-        list: List of tuples containing weather data
+        list: List of tuples containing weather forecast data
     """
-    print(f"Generating {num_records} random weather records from the past {days_back} days...")
+    print(f"Generating future weather forecast records for the next {days_ahead} days...")
     
-    cities = ['London', 'New York', 'Tokyo', 'Paris', 'Sydney', 'Berlin', 'Toronto', 'Mumbai', 'Dubai', 'Singapore']
-    weather_descriptions = ['Clear', 'Cloudy', 'Rainy', 'Snowy', 'Sunny', 'Foggy', 'Windy', 'Partly Cloudy', 'Thunderstorm', 'Drizzle']
-    utc_offsets = ['-5', '-6', '+9', '+1', '+10', '+1', '-5', '+5:30', '+4', '+8']
+    # City to UTC offset mapping (using winter time for consistency)
+    city_utc_offset = {
+        'London': '+0',
+        'New York': '-5',
+        'Tokyo': '+9',
+        'Paris': '+1',
+        'Sydney': '+10',
+        'Berlin': '+1',
+        'Toronto': '-5',
+        'Mumbai': '+5:30',
+        'Dubai': '+4',
+        'Singapore': '+8'
+    }
+    
+    weather_descriptions = ['Clear', 'Cloudy', 'Rainy', 'Snowy', 'Sunny', 'Foggy', 
+                            'Windy', 'Partly Cloudy', 'Thunderstorm', 'Drizzle', 'Hail', 'Sleet']
     
     records = []
-    now = datetime.now()
+    now = datetime.now().replace(minute=0, second=0, microsecond=0)  # Start at top of hour
     
-    for _ in range(num_records):
-        # Random timestamp within the past N days
-        days_ago = random.randint(0, days_back - 1)
-        hours_ago = random.randint(0, 23)
-        minutes_ago = random.randint(0, 59)
-        
-        timestamp = now - timedelta(days=days_ago, hours=hours_ago, minutes=minutes_ago)
-        
-        city = random.choice(cities)
-        temperature = round(random.uniform(-10, 40), 1)
-        weather_description = random.choice(weather_descriptions)
-        wind_speed = round(random.uniform(0, 30), 1)
-        utc_offset = random.choice(utc_offsets)
-        
-        records.append((
-            city,
-            temperature,
-            weather_description,
-            wind_speed,
-            timestamp,
-            utc_offset
-        ))
+    # Generate hourly forecast for each city for the next N days
+    for city, utc_offset in city_utc_offset.items():
+        # Generate 24 hours * days_ahead entries per city
+        for day in range(days_ahead):
+            for hour in range(24):
+                # Calculate forecast timestamp
+                forecast_time = now + timedelta(days=day, hours=hour)
+                
+                # Generate realistic weather data with some correlation
+                temperature = round(random.uniform(-5, 35), 1)
+                humidity = round(random.uniform(30, 95), 1)
+                pressure = round(random.uniform(1000, 1025), 2)
+                wind_speed = round(random.uniform(0, 25), 1)
+                weather_description = random.choice(weather_descriptions)
+                
+                records.append((
+                    city,
+                    temperature,
+                    weather_description,
+                    wind_speed,
+                    humidity,
+                    pressure,
+                    forecast_time,
+                    utc_offset
+                ))
     
+    print(f"Generated {len(records)} forecast records ({len(city_utc_offset)} cities × 24 hours × {days_ahead} days)")
     return records
 
 
@@ -131,12 +151,15 @@ def insert_batch_records(conn, records):
                 city,
                 temperature, 
                 weather_description, 
-                wind_speed, 
+                wind_speed,
+                humidity,
+                pressure,
                 time, 
                 inserted_at,
-                utc_offset
+                utc_offset,
+                is_forecast
             )
-            VALUES (%s, %s, %s, %s, %s, NOW(), %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), %s, TRUE)
             """,
             records
         )
@@ -165,12 +188,15 @@ def insert_record(conn, data):
             city,
             temperature, 
             weather_description, 
-            wind_speed, 
+            wind_speed,
+            humidity,
+            pressure,
             time, 
             inserted_at,
-            utc_offset
+            utc_offset,
+            is_forecast
             )
-            VALUES (%s, %s, %s, %s, %s, NOW(), %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), %s, FALSE)
         """,
         
         (
@@ -178,6 +204,8 @@ def insert_record(conn, data):
             weather['temperature'],
             weather['weather_descriptions'][0] if weather['weather_descriptions'] else None,
             weather['wind_speed'],
+            weather.get('humidity', 0),
+            weather.get('pressure', 0),
             location['localtime'],
             location['utc_offset']
         )
@@ -193,22 +221,21 @@ def insert_record(conn, data):
 
 
 
-def main(use_random_data=True, num_records=2000, days_back=14):
+def main(use_random_data=True, days_ahead=7):
     """
     Main function to insert weather data.
     
     Args:
-        use_random_data (bool): If True, generates random data; if False, fetches from API (default: True)
-        num_records (int): Number of random records to generate (default: 2000)
-        days_back (int): Number of days back for random data (default: 14)
+        use_random_data (bool): If True, generates future forecast data; if False, fetches from API (default: True)
+        days_ahead (int): Number of days ahead for forecast data (default: 7)
     """
     try:
         conn = connect_to_db()
         create_table(conn)
         
         if use_random_data:
-            # Generate and insert 2000 random records
-            records = generate_random_weather_data(num_records, days_back)
+            # Generate and insert forecast data for the next 7 days
+            records = generate_random_weather_data(days_ahead)
             insert_batch_records(conn, records)
         else:
             # Fetch from API and insert single record
@@ -225,8 +252,8 @@ def main(use_random_data=True, num_records=2000, days_back=14):
 
 
 if __name__ == "__main__":
-    # By default, insert 2000 random records from the past 2 weeks
-    main(use_random_data=True, num_records=2000, days_back=14)
+    # By default, insert 7 days of future forecast data
+    main(use_random_data=True, days_ahead=7)
     
 
  

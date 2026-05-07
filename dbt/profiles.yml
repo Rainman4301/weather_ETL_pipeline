@@ -9,4 +9,13 @@ myproject:
       threads: 4
       type: postgres
       user: db_user
+    analytics:
+      dbname: db
+      host: db
+      pass: db_password
+      port: 5432
+      schema: analytics
+      threads: 4
+      type: postgres
+      user: db_user
   target: dev

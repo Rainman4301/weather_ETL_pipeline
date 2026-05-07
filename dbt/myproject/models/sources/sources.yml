@@ -9,8 +9,11 @@ sources:
           - name: id
           - name: city
           - name: temperature
-          - name: weather_descriptions
+          - name: weather_description
           - name: wind_speed
+          - name: humidity
+          - name: pressure
           - name: time
           - name: inserted_at
-          - name: utc_offset 
+          - name: utc_offset
+          - name: is_forecast 

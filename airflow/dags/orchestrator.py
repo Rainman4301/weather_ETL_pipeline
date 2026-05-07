@@ -18,7 +18,7 @@ from docker.types import Mount
 
 default_args = {
     'description': 'A DAG to orchestrate the weather ETL pipeline',
-    'start_date': datetime(2026, 4, 3),
+    'start_date': datetime(2026, 5, 7),
     'catchup': False,
 }
 
@@ -26,7 +26,8 @@ default_args = {
 dag = DAG(
     dag_id='weather_api_dbt_orchestrator',
     default_args=default_args,
-    schedule=timedelta(minutes=5)
+    schedule=timedelta(hours=1),
+    description='Hourly weather forecast ETL pipeline'
 )
 
 with dag:

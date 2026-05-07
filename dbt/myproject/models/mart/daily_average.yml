@@ -1,0 +1,44 @@
+version: 2
+
+models:
+  - name: daily_average
+    description: "Daily weather statistics aggregated from hourly forecast data. Provides average temperature, wind speed, humidity, and pressure for each city by date."
+    columns:
+      - name: city
+        description: "City name"
+        tests:
+          - not_null
+      - name: date
+        description: "Date (in city's local timezone)"
+        tests:
+          - not_null
+      - name: avg_temperature
+        description: "Average temperature in Celsius for the day"
+        tests:
+          - not_null
+      - name: avg_wind_speed
+        description: "Average wind speed in km/h for the day"
+        tests:
+          - not_null
+      - name: avg_humidity
+        description: "Average humidity percentage for the day. Range 0-100%"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 100]
+              config:
+                where: "avg_humidity >= 0 AND avg_humidity <= 100"
+      - name: avg_pressure
+        description: "Average atmospheric pressure in hPa for the day. Range 1000-1025 hPa"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1000, 1025]
+              config:
+                where: "avg_pressure >= 1000 AND avg_pressure <= 1025"
+      - name: has_forecast_data
+        description: "Flag indicating if this day contains forecast data (1=yes, 0=no)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
