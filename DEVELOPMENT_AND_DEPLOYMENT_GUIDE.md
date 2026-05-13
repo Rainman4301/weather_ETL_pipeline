@@ -1,5 +1,4 @@
 # Development & Deployment Complete Guide
-# Development & Deployment Complete Guide
 
 This is your comprehensive guide for local development, CI/CD setup, and deployment to Azure.
 
