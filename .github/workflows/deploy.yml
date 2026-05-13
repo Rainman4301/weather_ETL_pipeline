@@ -1,0 +1,241 @@
+# name: Test & Deploy to Azure VM
+
+# on:
+#   push:
+#     branches:
+#       - main
+#       - expansion
+#   pull_request:
+#     branches:
+#       - main
+
+# env:
+#   REGISTRY: ghcr.io
+#   IMAGE_NAME: ${{ github.repository }}
+
+# jobs:
+#   # ============================================
+#   # STAGE 1: TESTING (Runs on every PR and push)
+#   # ============================================
+#   test:
+#     name: Test & Validate
+#     runs-on: ubuntu-latest
+#     services:
+#       postgres:
+#         image: postgres:14.17
+#         env:
+#           POSTGRES_DB: test_db
+#           POSTGRES_USER: test_user
+#           POSTGRES_PASSWORD: test_password
+#         options: >-
+#           --health-cmd pg_isready
+#           --health-interval 10s
+#           --health-timeout 5s
+#           --health-retries 5
+#         ports:
+#           - 5432:5432
+
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       - name: Set up Python
+#         uses: actions/setup-python@v4
+#         with:
+#           python-version: '3.10'
+#           cache: 'pip'
+
+#       - name: Install Python dependencies
+#         run: |
+#           python -m pip install --upgrade pip
+#           pip install apache-airflow==3.0.0
+#           pip install dbt-postgres
+#           pip install psycopg2-binary
+#           pip install requests
+
+#       - name: Validate Airflow DAGs
+#         run: |
+#           export AIRFLOW_HOME=$(pwd)/airflow
+#           export AIRFLOW__CORE__LOAD_EXAMPLES=false
+#           airflow dags validate airflow/dags/orchestrator.py || true
+#         continue-on-error: true
+
+#       - name: Lint Python files
+#         run: |
+#           pip install flake8
+#           flake8 api_request/ --count --select=E9,F63,F7,F82 --show-source --statistics || true
+#         continue-on-error: true
+
+#       - name: Test dbt models (parse)
+#         run: |
+#           cd dbt/myproject
+#           dbt parse --profiles-dir ../
+
+#       - name: Test Python API modules
+#         run: |
+#           python -m pytest api_request/ -v || true
+#         continue-on-error: true
+
+#       - name: Test database connectivity
+#         env:
+#           DB_HOST: localhost
+#           DB_PORT: 5432
+#           DB_NAME: test_db
+#           DB_USER: test_user
+#           DB_PASSWORD: test_password
+#         run: |
+#           python -c "
+#           import psycopg2
+#           try:
+#               conn = psycopg2.connect(
+#                   host='localhost',
+#                   port=5432,
+#                   database='test_db',
+#                   user='test_user',
+#                   password='test_password'
+#               )
+#               print('✓ Database connection successful')
+#               conn.close()
+#           except Exception as e:
+#               print(f'✗ Database connection failed: {e}')
+#           "
+
+#   # ============================================
+#   # STAGE 2: BUILD (Only on main branch push)
+#   # ============================================
+#   build:
+#     name: Build & Push Docker Images
+#     needs: test
+#     runs-on: ubuntu-latest
+#     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+#     permissions:
+#       contents: read
+#       packages: write
+
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@v3
+
+#       - name: Log in to Container Registry
+#         uses: docker/login-action@v3
+#         with:
+#           registry: ${{ env.REGISTRY }}
+#           username: ${{ github.actor }}
+#           password: ${{ secrets.GITHUB_TOKEN }}
+
+#       - name: Build and push Docker images
+#         run: |
+#           echo "✓ Docker images ready"
+#           echo "Note: Using official images from Docker Hub"
+
+#   # ============================================
+#   # STAGE 3: DEPLOY (Only main branch, after test)
+#   # ============================================
+#   deploy:
+#     name: Deploy to Azure VM
+#     needs: test
+#     runs-on: ubuntu-latest
+#     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       - name: Deploy to Azure VM via SSH
+#         env:
+#           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+#           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
+#           AZURE_VM_PRIVATE_KEY: ${{ secrets.AZURE_VM_PRIVATE_KEY }}
+#           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+#           WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
+#           WEATHER_API_CITY: ${{ secrets.WEATHER_API_CITY }}
+#           SUPERSET_ADMIN_PASSWORD: ${{ secrets.SUPERSET_ADMIN_PASSWORD }}
+#         run: |
+#           # Setup SSH
+#           mkdir -p ~/.ssh
+#           echo "$AZURE_VM_PRIVATE_KEY" > ~/.ssh/id_rsa
+#           chmod 600 ~/.ssh/id_rsa
+#           ssh-keyscan -H $AZURE_VM_HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+
+#           # No quotes on EOF so the runner expands $secrets before sending script to VM
+#           ssh -o StrictHostKeyChecking=no $AZURE_VM_USER@$AZURE_VM_HOST << EOF
+#             set -e
+#             echo "🔄 Starting deployment..."
+#             cd ~/weather_ETL_pipeline || exit 1
+
+#             git fetch origin main
+#             git reset --hard origin/main
+
+#             # Write airflow/.env using echo statements — avoids heredoc-inside-heredoc YAML bug
+#             echo "AIRFLOW__CORE__LOAD_EXAMPLES=false" > airflow/.env
+#             echo "AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags" >> airflow/.env
+#             echo "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@db:5432/airflow_db" >> airflow/.env
+#             echo "WEATHER_API_KEY=$WEATHER_API_KEY" >> airflow/.env
+#             echo "WEATHER_API_CITY=$WEATHER_API_CITY" >> airflow/.env
+
+#             # Write docker/.env
+#             echo "POSTGRES_PASSWORD=$DB_PASSWORD" > docker/.env
+#             echo "SUPERSET_ADMIN_PASSWORD=$SUPERSET_ADMIN_PASSWORD" >> docker/.env
+
+#             echo "🛑 Stopping existing containers..."
+#             docker compose down || true
+
+#             echo "📦 Pulling latest images and starting services..."
+#             docker compose pull
+#             docker compose up -d
+
+#             echo "⏳ Waiting for services to start..."
+#             sleep 30
+
+#             echo "✓ Checking service status..."
+#             docker compose ps
+
+#             echo "✅ Deployment complete!"
+#           EOF
+
+#       - name: Verify Deployment
+#         env:
+#           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+#           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
+#           AZURE_VM_PRIVATE_KEY: ${{ secrets.AZURE_VM_PRIVATE_KEY }}
+#         run: |
+#           mkdir -p ~/.ssh
+#           echo "$AZURE_VM_PRIVATE_KEY" > ~/.ssh/id_rsa
+#           chmod 600 ~/.ssh/id_rsa
+
+#           # Quoted 'EOF' is intentional here — no secrets needed, just status checks
+#           ssh -o StrictHostKeyChecking=no $AZURE_VM_USER@$AZURE_VM_HOST << 'EOF'
+#             echo "🔍 Verifying services..."
+#             docker compose ps
+#             echo "Airflow URL: http://localhost:8000"
+#             echo "Superset URL: http://localhost:8088"
+#           EOF
+
+#   # ============================================
+#   # NOTIFICATIONS
+#   # ============================================
+#   notify:
+#     name: Send Notifications
+#     needs: [test, deploy]
+#     runs-on: ubuntu-latest
+#     if: always()
+
+#     steps:
+#       - name: Test Status
+#         run: |
+#           if [ "${{ needs.test.result }}" == "success" ]; then
+#             echo "✅ Tests PASSED"
+#           else
+#             echo "❌ Tests FAILED"
+#           fi
+
+#       - name: Deployment Status
+#         run: |
+#           if [ "${{ needs.deploy.result }}" == "success" ]; then
+#             echo "✅ Deployment SUCCESSFUL"
+#           else
+#             echo "⏭️ Deployment skipped (not main branch)"
+#           fi

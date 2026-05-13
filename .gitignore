@@ -11,7 +11,7 @@ docker/.env.*.local
 # ============================================
 # PYTHON
 # ============================================
-__pycache__/
+api_request/__pycache__/*
 *.py[cod]
 *$py.class
 *.so
