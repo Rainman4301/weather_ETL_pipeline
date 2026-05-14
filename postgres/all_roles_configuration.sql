@@ -1,114 +1,226 @@
--- ============================================================================
--- Superset Complete Role Configuration Script (Fixed)
--- Defines all roles with granular permissions for public weather ETL pipeline
--- ============================================================================
-
--- Get all existing roles first
-SELECT 'Checking existing roles:' as info;
-SELECT id, name FROM ab_role ORDER BY name;
-
--- Create or get Public role
-INSERT INTO ab_role (name) VALUES ('Public') 
-ON CONFLICT DO NOTHING;
-
--- Configure roles
-DO $$ 
-DECLARE 
-    admin_role_id INT;
-    alpha_role_id INT;
-    gamma_role_id INT;
-    sql_lab_role_id INT;
-    public_role_id INT;
-BEGIN
-    -- Get role IDs
-    SELECT id INTO admin_role_id FROM ab_role WHERE name = 'Admin';
-    SELECT id INTO alpha_role_id FROM ab_role WHERE name = 'Alpha';
-    SELECT id INTO gamma_role_id FROM ab_role WHERE name = 'Gamma';
-    SELECT id INTO sql_lab_role_id FROM ab_role WHERE name = 'sql_lab';
-    SELECT id INTO public_role_id FROM ab_role WHERE name = 'Public';
-    
-    -- ========================================================================
-    -- ALPHA ROLE - Full data access: create/edit datasets, dashboards, charts
-    -- ========================================================================
-    DELETE FROM ab_permission_view_role WHERE role_id = alpha_role_id;
-    
-    INSERT INTO ab_permission_view_role (permission_view_id, role_id)
-    SELECT DISTINCT pv.id, alpha_role_id
-    FROM ab_permission_view pv
-    INNER JOIN ab_permission p ON pv.permission_id = p.id
-    INNER JOIN ab_view_menu vm ON pv.view_menu_id = vm.id
-    WHERE vm.name NOT IN ('SecurityRestApi', 'RoleRestApi', 'UserDBModelView', 'UserInfoRestApi')
-    AND p.name NOT IN ('all_database_access', 'all_datasource_access', 'all_query_access')
-    ON CONFLICT (permission_view_id, role_id) DO NOTHING;
-    
-    -- ========================================================================
-    -- GAMMA ROLE - Public users: explore + create charts (read-only on data)
-    -- ========================================================================
-    DELETE FROM ab_permission_view_role WHERE role_id = gamma_role_id;
-    
-    INSERT INTO ab_permission_view_role (permission_view_id, role_id)
-    SELECT DISTINCT pv.id, gamma_role_id
-    FROM ab_permission_view pv
-    INNER JOIN ab_permission p ON pv.permission_id = p.id
-    INNER JOIN ab_view_menu vm ON pv.view_menu_id = vm.id
-    WHERE (vm.name IN ('Chart', 'Dashboard', 'Explore', 'Api', 'SQLLab', 'Superset', 'MenuApi', 
-                       'DynamicPlugin', 'AvailableDomains', 'Tag', 'Datasets', 'Databases', 
-                       'Dashboards', 'Charts', 'Data', 'ExploreFormDataRestApi', 'ExplorePermalinkRestApi'))
-    AND (p.name IN ('can_read', 'can_write', 'can_query', 'can_query_form_data', 'can_estimate_query_cost',
-                    'menu_access', 'can_show', 'can_get', 'can_run_async_queries', 'can_execute_sql_query',
-                    'can_access'))
-    ON CONFLICT (permission_view_id, role_id) DO NOTHING;
-    
-    -- ========================================================================
-    -- SQL_LAB ROLE - Users who can run SQL queries only
-    -- ========================================================================
-    IF sql_lab_role_id IS NOT NULL THEN
-        DELETE FROM ab_permission_view_role WHERE role_id = sql_lab_role_id;
-        
-        INSERT INTO ab_permission_view_role (permission_view_id, role_id)
-        SELECT DISTINCT pv.id, sql_lab_role_id
-        FROM ab_permission_view pv
-        INNER JOIN ab_permission p ON pv.permission_id = p.id
-        INNER JOIN ab_view_menu vm ON pv.view_menu_id = vm.id
-        WHERE vm.name IN ('Database', 'Dataset', 'SQLLab', 'Api', 'Superset', 'MenuApi', 
-                          'DynamicPlugin', 'Databases', 'Data', 'SavedQuery')
-        AND p.name IN ('can_read', 'can_access', 'can_query', 'can_query_form_data', 
-                       'can_estimate_query_cost', 'can_run_sync_queries', 'can_run_async_queries',
-                       'can_execute_sql_query', 'can_show', 'can_get', 'menu_access')
-        ON CONFLICT (permission_view_id, role_id) DO NOTHING;
-    END IF;
-    
-    -- ========================================================================
-    -- PUBLIC ROLE - Same as Gamma (anonymous users can explore + build charts)
-    -- ========================================================================
-    DELETE FROM ab_permission_view_role WHERE role_id = public_role_id;
-    
-    INSERT INTO ab_permission_view_role (permission_view_id, role_id)
-    SELECT DISTINCT pv.id, public_role_id
-    FROM ab_permission_view pv
-    INNER JOIN ab_permission p ON pv.permission_id = p.id
-    INNER JOIN ab_view_menu vm ON pv.view_menu_id = vm.id
-    WHERE (vm.name IN ('Chart', 'Dashboard', 'Explore', 'Api', 'SQLLab', 'Superset', 'MenuApi', 
-                       'DynamicPlugin', 'AvailableDomains', 'Tag', 'Datasets', 'Databases', 
-                       'Dashboards', 'Charts', 'Data', 'ExploreFormDataRestApi', 'ExplorePermalinkRestApi'))
-    AND (p.name IN ('can_read', 'can_write', 'can_query', 'can_query_form_data', 'can_estimate_query_cost',
-                    'menu_access', 'can_show', 'can_get', 'can_run_async_queries', 'can_execute_sql_query',
-                    'can_access'))
-    ON CONFLICT (permission_view_id, role_id) DO NOTHING;
-    
-    RAISE NOTICE 'Role permissions configured successfully!';
-END $$;
-
--- ============================================================================
--- VERIFICATION - Show all roles with their permission counts
--- ============================================================================
-SELECT 
-    r.id,
-    r.name as role,
-    COUNT(DISTINCT pv.id) as permission_count
-FROM ab_role r
-LEFT JOIN ab_permission_view_role pvr ON r.id = pvr.role_id
-LEFT JOIN ab_permission_view pv ON pvr.permission_view_id = pv.id
-WHERE r.name IN ('Admin', 'Alpha', 'Gamma', 'sql_lab', 'Public')
-GROUP BY r.id, r.name
-ORDER BY r.name;
+-- -- ============================================================================
+-- -- Superset Public (Anonymous) Dashboard Access — with Filter Support
+-- -- ============================================================================
+-- -- PREREQUISITE (superset_config.py — NOT in this SQL file):
+-- --
+-- --   AUTH_ROLE_PUBLIC = 'Public'
+-- --   PUBLIC_ROLE_LIKE = 'Gamma'          # baseline copy, we then override below
+-- --   GUEST_ROLE_NAME = 'Public'          # needed for embedded dashboards
+-- --   WTF_CSRF_ENABLED = False            # disable CSRF for anonymous filter posts
+-- --   SESSION_COOKIE_SAMESITE = None
+-- --   SESSION_COOKIE_SECURE = True        # set False if not on HTTPS (dev only)
+-- --   FEATURE_FLAGS = {
+-- --       "DASHBOARD_CROSS_FILTERS": True,
+-- --       "DASHBOARD_FILTERS_EXPERIMENTAL": True,
+-- --       "ENABLE_TEMPLATE_REMOVE_FILTERS": True,
+-- --   }
+-- --
+-- -- After editing superset_config.py, restart Superset:
+-- --   docker compose restart superset
+-- -- ============================================================================
+ 
+-- DO $$
+-- DECLARE
+--     public_role_id  INT;
+--     pv_id           INT;
+-- BEGIN
+--     -- ----------------------------------------------------------------
+--     -- 0. Resolve Public role ID
+--     -- ----------------------------------------------------------------
+--     SELECT id INTO public_role_id FROM ab_role WHERE name = 'Public';
+ 
+--     IF public_role_id IS NULL THEN
+--         INSERT INTO ab_role (name) VALUES ('Public') RETURNING id INTO public_role_id;
+--         RAISE NOTICE 'Created Public role (id=%)', public_role_id;
+--     ELSE
+--         RAISE NOTICE 'Found Public role (id=%)', public_role_id;
+--     END IF;
+ 
+--     -- ----------------------------------------------------------------
+--     -- 1. Wipe existing Public permissions (clean slate)
+--     -- ----------------------------------------------------------------
+--     DELETE FROM ab_permission_view_role WHERE role_id = public_role_id;
+ 
+--     -- ----------------------------------------------------------------
+--     -- 2. Core read/explore permissions
+--     --    (Dashboard viewing, chart rendering, dataset metadata)
+--     -- ----------------------------------------------------------------
+--     INSERT INTO ab_permission_view_role (permission_view_id, role_id)
+--     SELECT DISTINCT pv.id, public_role_id
+--     FROM ab_permission_view pv
+--     JOIN ab_permission  p  ON pv.permission_id  = p.id
+--     JOIN ab_view_menu   vm ON pv.view_menu_id   = vm.id
+--     WHERE vm.name IN (
+--         'Chart',
+--         'Dashboard',
+--         'Dashboards',
+--         'Charts',
+--         'Datasets',
+--         'Databases',
+--         'Explore',
+--         'Data',
+--         'Api',
+--         'Superset',
+--         'MenuApi',
+--         'DynamicPlugin',
+--         'AvailableDomains',
+--         'Tag',
+--         'ExploreFormDataRestApi',
+--         'ExplorePermalinkRestApi'
+--     )
+--     AND p.name IN (
+--         -- READ-ONLY only. Never include can_write, can_add, can_edit,
+--         -- can_delete, or can_execute_sql_query here.
+--         'can_read',              -- list/detail views for dashboards & charts
+--         'can_show',              -- legacy Flask-AppBuilder read alias
+--         'can_get',               -- REST GET endpoints
+--         'can_access',            -- general resource access gate
+--         'can_query',             -- chart data queries (powers chart rendering)
+--         'can_query_form_data',   -- Explore form-data queries
+--         'can_run_async_queries', -- async chart data fetching
+--         'menu_access'            -- shows nav items to anonymous users
+--     )
+--     ON CONFLICT (permission_view_id, role_id) DO NOTHING;
+ 
+--     RAISE NOTICE 'Step 2 done — READ-ONLY core permissions granted (no write/SQL access)';
+ 
+--     -- ----------------------------------------------------------------
+--     -- 3. Filter state permissions  (can_write is intentional here ONLY)
+--     --    These view menus are session-scoped filter state — not content.
+--     --    can_write here means "save my active filter selection", NOT
+--     --    "create a chart or dashboard".
+--     --
+--     --    SavedQuery is intentionally excluded — that's SQL Lab territory.
+--     -- ----------------------------------------------------------------
+--     INSERT INTO ab_permission_view_role (permission_view_id, role_id)
+--     SELECT DISTINCT pv.id, public_role_id
+--     FROM ab_permission_view pv
+--     JOIN ab_permission  p  ON pv.permission_id  = p.id
+--     JOIN ab_view_menu   vm ON pv.view_menu_id   = vm.id
+--     WHERE vm.name IN (
+--         'DashboardFilterStateRestApi',  -- stores active filter selections per session
+--         'DashboardPermalinkRestApi',    -- shareable filter-state URLs
+--         'FilterSets'                    -- saved filter sets attached to a dashboard
+--     )
+--     AND p.name IN (
+--         'can_read',    -- load existing filter state
+--         'can_write',   -- save filter selection (session-scoped, not content creation)
+--         'can_get',     -- REST GET for filter state
+--         'can_delete'   -- clear own filter state
+--     )
+--     ON CONFLICT (permission_view_id, role_id) DO NOTHING;
+ 
+--     RAISE NOTICE 'Step 3 done — filter state permissions granted (scoped to filter APIs only)';
+ 
+--     -- ----------------------------------------------------------------
+--     -- 4. Datasource-level access
+--     --    The Public role needs explicit access to each datasource it
+--     --    will query. View menu entries look like:
+--     --        [weather_db].[weather_hourly](id:1)
+--     --    This block grants access to ALL currently registered datasets.
+--     --    To restrict to specific datasets, add a WHERE clause like:
+--     --        AND vm.name LIKE '%weather%'
+--     -- ----------------------------------------------------------------
+--     INSERT INTO ab_permission_view_role (permission_view_id, role_id)
+--     SELECT DISTINCT pv.id, public_role_id
+--     FROM ab_permission_view pv
+--     JOIN ab_permission  p  ON pv.permission_id  = p.id
+--     JOIN ab_view_menu   vm ON pv.view_menu_id   = vm.id
+--     WHERE p.name = 'datasource access'
+--       AND vm.name LIKE '[%].[%](id:%)'   -- matches all dataset view-menu entries
+--     -- Uncomment to restrict to specific datasets only:
+--     -- AND vm.name LIKE '%weather%'
+--     ON CONFLICT (permission_view_id, role_id) DO NOTHING;
+ 
+--     -- Count how many datasource grants were added
+--     RAISE NOTICE 'Step 4 done — datasource access grants applied';
+ 
+--     -- ----------------------------------------------------------------
+--     -- 5. Database-level access (needed for query execution backing charts)
+--     -- ----------------------------------------------------------------
+--     INSERT INTO ab_permission_view_role (permission_view_id, role_id)
+--     SELECT DISTINCT pv.id, public_role_id
+--     FROM ab_permission_view pv
+--     JOIN ab_permission  p  ON pv.permission_id  = p.id
+--     JOIN ab_view_menu   vm ON pv.view_menu_id   = vm.id
+--     WHERE p.name = 'database access'
+--       AND vm.name LIKE '[%](id:%)'        -- matches all database view-menu entries
+--     -- Uncomment to restrict to a specific database:
+--     -- AND vm.name LIKE '%weather_db%'
+--     ON CONFLICT (permission_view_id, role_id) DO NOTHING;
+ 
+--     RAISE NOTICE 'Step 5 done — database access grants applied';
+ 
+--     RAISE NOTICE '=== Public role configured successfully (id=%) ===', public_role_id;
+-- END $$;
+ 
+ 
+-- -- ============================================================================
+-- -- VERIFICATION
+-- -- Run this after the block above to confirm what was granted.
+-- -- ============================================================================
+ 
+-- -- 1. Total permissions on the Public role
+-- SELECT
+--     r.name                          AS role,
+--     COUNT(DISTINCT pvr.permission_view_id) AS total_permissions
+-- FROM ab_role r
+-- JOIN ab_permission_view_role pvr ON r.id = pvr.role_id
+-- WHERE r.name = 'Public'
+-- GROUP BY r.name;
+ 
+-- -- 2. Breakdown by view menu (helps confirm filter-state and datasource rows exist)
+-- SELECT
+--     vm.name                         AS view_menu,
+--     p.name                          AS permission,
+--     COUNT(*)                        AS cnt
+-- FROM ab_permission_view_role pvr
+-- JOIN ab_role              r  ON pvr.role_id           = r.id
+-- JOIN ab_permission_view   pv ON pvr.permission_view_id = pv.id
+-- JOIN ab_permission        p  ON pv.permission_id       = p.id
+-- JOIN ab_view_menu         vm ON pv.view_menu_id        = vm.id
+-- WHERE r.name = 'Public'
+-- GROUP BY vm.name, p.name
+-- ORDER BY vm.name, p.name;
+ 
+-- -- 3. Datasource grants specifically — should list each weather dataset row
+-- SELECT
+--     vm.name     AS datasource_view_menu,
+--     p.name      AS permission
+-- FROM ab_permission_view_role pvr
+-- JOIN ab_role              r  ON pvr.role_id           = r.id
+-- JOIN ab_permission_view   pv ON pvr.permission_view_id = pv.id
+-- JOIN ab_permission        p  ON pv.permission_id       = p.id
+-- JOIN ab_view_menu         vm ON pv.view_menu_id        = vm.id
+-- WHERE r.name    = 'Public'
+--   AND p.name    = 'datasource access'
+-- ORDER BY vm.name;
+ 
+-- -- ============================================================================
+-- -- SAFETY AUDIT — must return zero rows
+-- -- If any rows appear here, something is wrong; remove those permissions.
+-- -- ============================================================================
+-- SELECT
+--     vm.name     AS view_menu,
+--     p.name      AS dangerous_permission
+-- FROM ab_permission_view_role pvr
+-- JOIN ab_role              r  ON pvr.role_id           = r.id
+-- JOIN ab_permission_view   pv ON pvr.permission_view_id = pv.id
+-- JOIN ab_permission        p  ON pv.permission_id       = p.id
+-- JOIN ab_view_menu         vm ON pv.view_menu_id        = vm.id
+-- WHERE r.name = 'Public'
+--   AND (
+--       -- write/mutate permissions on content objects are never OK for public
+--       (p.name IN ('can_write', 'can_add', 'can_edit', 'can_delete')
+--        AND vm.name NOT IN (
+--            'DashboardFilterStateRestApi',  -- these three are the only
+--            'DashboardPermalinkRestApi',    -- view menus where write is
+--            'FilterSets'                   -- intentional for filter state
+--        )
+--       )
+--       -- SQL execution must never be on the Public role
+--       OR p.name IN ('can_execute_sql_query', 'all_database_access',
+--                     'all_datasource_access', 'all_query_access')
+--   )
+-- ORDER BY vm.name, p.name;
+-- -- Expected result: (0 rows)
