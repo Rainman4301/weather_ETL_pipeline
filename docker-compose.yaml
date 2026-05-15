@@ -46,6 +46,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:
       - "1001"  # Add the airflow user to the root group to access the Docker socket
+      - "988"
     depends_on:
       - db
     networks:
