@@ -11,7 +11,36 @@ from datetime import datetime, timedelta
 from docker.types import Mount
 
 
+import os
+import docker
+def get_host_repo_path():
+    """
+    Finds the host path by looking at the /opt/airflow/dags mount
+    and stripping the sub-path to find the project root.
+    """
+    try:
+        client = docker.from_env()
+        container_id = os.environ.get('HOSTNAME')
+        container = client.containers.get(container_id)
+        
+        for mount in container.attrs['Mounts']:
+            # We look for the dags mount because it's still active in your YAML
+            if mount['Destination'] == '/opt/airflow/dags':
+                # Example: mount['Source'] is '/home/rainuser/WeatherETL/airflow/dags'
+                host_dags_path = mount['Source']
+                
+                # Strip '/airflow/dags' to get '/home/rainuser/WeatherETL'
+                # This is the path the VM needs for the DockerOperator mounts
+                root_path = host_dags_path.replace('/airflow/dags', '')
+                return root_path
+                
+    except Exception as e:
+        print(f"Dynamic path discovery failed: {e}")
+        return '/opt/airflow' # Last resort fallback
+    return '/opt/airflow'
 
+# Get the host path dynamically
+HOST_REPO_PATH = get_host_repo_path()
 
     
 
@@ -40,14 +69,16 @@ with dag:
         image='ghcr.io/dbt-labs/dbt-postgres:1.9.latest',
         command='run',
         working_dir='/usr/app',
+        # FIX 1: Disable temporary directory mounting
+        mount_tmp_dir=False,
         mounts =[
             Mount(
-                source='/home/rain/repo/weather_ETL_pipeline/dbt/myproject',
+                source=f"{HOST_REPO_PATH}/dbt/myproject",
                 target='/usr/app',
                 type='bind'
             ),
             Mount(
-                source='/home/rain/repo/weather_ETL_pipeline/dbt/profiles.yml',
+                source=f"{HOST_REPO_PATH}/dbt/profiles.yml",
                 target='/root/.dbt/profiles.yml',
                 type='bind'
             )
