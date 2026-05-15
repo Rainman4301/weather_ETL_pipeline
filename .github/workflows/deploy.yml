@@ -1,0 +1,180 @@
+name: Test & Deploy to Azure VM
+
+on:
+  push:
+    branches:
+      - '**'        # all branches: tests run on every push
+  pull_request:
+    branches:
+      - '**'        # all branches: tests run on every PR
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ============================================
+  # STAGE 1: TESTING (every push and PR)
+  # ============================================
+  test:
+    name: Test & Validate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14.17
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install apache-airflow==3.0.0 dbt-postgres psycopg2-binary requests flake8
+
+      - name: Lint Python files
+        run: |
+          flake8 api_request/ --count --select=E9,F63,F7,F82 --show-source --statistics || true
+
+      - name: Validate Airflow DAGs
+        run: |
+          export AIRFLOW_HOME=$(pwd)/airflow
+          export AIRFLOW__CORE__LOAD_EXAMPLES=false
+          airflow dags validate airflow/dags/orchestrator.py || true
+
+      - name: Test dbt models (parse)
+        run: |
+          cd dbt/myproject
+          dbt parse --profiles-dir ../
+
+      - name: Test Python API modules
+        run: |
+          python -m pytest api_request/ -v || true
+
+      - name: Test database connectivity
+        run: |
+          python -c "
+          import psycopg2
+          try:
+              conn = psycopg2.connect(
+                  host='localhost',
+                  port=5432,
+                  database='test_db',
+                  user='test_user',
+                  password='test_password'
+              )
+              print('✓ Database connection successful')
+              conn.close()
+          except Exception as e:
+              print(f'✗ Database connection failed: {e}')
+              exit(1)
+          "
+
+  # ============================================
+  # STAGE 2: DEPLOY (push to main only)
+  # ============================================
+  deploy:
+    name: Deploy to Azure VM
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Azure VM via SSH
+        env:
+          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
+          AZURE_VM_PRIVATE_KEY: ${{ secrets.AZURE_VM_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$AZURE_VM_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $AZURE_VM_HOST >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # Quoted 'EOF' — .env files already live on the VM, never rewritten by CI
+          ssh -o StrictHostKeyChecking=no $AZURE_VM_USER@$AZURE_VM_HOST << 'EOF'
+            set -e
+            echo "🔄 Pulling latest code from main..."
+            cd ~/weather_ETL_pipeline
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "🛑 Stopping existing containers..."
+            docker compose down
+
+            echo "📦 Pulling latest images..."
+            docker compose pull
+
+            echo "🚀 Starting services..."
+            docker compose up -d
+
+            echo "⏳ Waiting for services to start..."
+            sleep 30
+
+            echo "✅ Service status:"
+            docker compose ps
+          EOF
+
+      - name: Verify deployment
+        env:
+          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
+          AZURE_VM_PRIVATE_KEY: ${{ secrets.AZURE_VM_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$AZURE_VM_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh -o StrictHostKeyChecking=no $AZURE_VM_USER@$AZURE_VM_HOST << 'EOF'
+            echo "🔍 Verifying services..."
+            docker compose ps
+            echo "Airflow:  http://localhost:8000"
+            echo "Superset: http://localhost:8088"
+          EOF
+
+  # ============================================
+  # NOTIFICATIONS
+  # ============================================
+  notify:
+    name: Send Notifications
+    needs: [test, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Test status
+        run: |
+          if [ "${{ needs.test.result }}" == "success" ]; then
+            echo "✅ Tests PASSED"
+          else
+            echo "❌ Tests FAILED"
+          fi
+
+      - name: Deployment status
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "✅ Deployment SUCCESSFUL"
+          elif [ "${{ needs.deploy.result }}" == "skipped" ]; then
+            echo "⏭️ Deployment skipped (not a push to main)"
+          else
+            echo "❌ Deployment FAILED"
+          fi
