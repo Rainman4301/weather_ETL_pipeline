@@ -104,19 +104,68 @@ jobs:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
           AZURE_VM_PRIVATE_KEY: ${{ secrets.AZURE_VM_PRIVATE_KEY }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+          SUPERSET_SECRET_KEY: ${{ secrets.SUPERSET_SECRET_KEY }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
+          WEATHER_API_CITY: ${{ secrets.WEATHER_API_CITY }}
+          WEATHER_API_BASE_URL: ${{ secrets.WEATHER_API_BASE_URL }}
         run: |
           mkdir -p ~/.ssh
           echo "$AZURE_VM_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H $AZURE_VM_HOST >> ~/.ssh/known_hosts 2>/dev/null || true
 
-          # Quoted 'EOF' — .env files already live on the VM, never rewritten by CI
-          ssh -o StrictHostKeyChecking=no $AZURE_VM_USER@$AZURE_VM_HOST << 'EOF'
+
+
+          ssh -o StrictHostKeyChecking=no $AZURE_VM_USER@$AZURE_VM_HOST << EOF
             set -e
             echo "🔄 Pulling latest code from main..."
             cd ~/weather_ETL_pipeline
             git fetch origin main
             git reset --hard origin/main
+
+            # Write airflow/.env
+            echo "WEATHER_API_BASE_URL=$WEATHER_API_BASE_URL" > airflow/.env
+            echo "WEATHER_API_KEY=$WEATHER_API_KEY" >> airflow/.env
+            echo "WEATHER_API_CITY=$WEATHER_API_CITY" >> airflow/.env
+
+            # Write docker/.env — static config + injected secrets
+            echo "PYTHONUNBUFFERED=1" > docker/.env
+            echo "COMPOSE_PROJECT_NAME=superset" >> docker/.env
+            echo "DEV_MODE=true" >> docker/.env
+            echo "DATABASE_DB=superset" >> docker/.env
+            echo "DATABASE_HOST=db" >> docker/.env
+            echo "DATABASE_PASSWORD=$DATABASE_PASSWORD" >> docker/.env
+            echo "DATABASE_USER=superset" >> docker/.env
+            echo "EXAMPLES_DB=examples_db" >> docker/.env
+            echo "EXAMPLES_HOST=db" >> docker/.env
+            echo "EXAMPLES_USER=examples" >> docker/.env
+            echo "EXAMPLES_PASSWORD=examples" >> docker/.env
+            echo "EXAMPLES_PORT=5432" >> docker/.env
+            echo "DATABASE_PORT=5432" >> docker/.env
+            echo "DATABASE_DIALECT=postgresql+psycopg2" >> docker/.env
+            echo "POSTGRES_DB=superset_db" >> docker/.env
+            echo "POSTGRES_USER=superset" >> docker/.env
+            echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" >> docker/.env
+            echo "PYTHONPATH=/app/pythonpath:/app/docker/pythonpath_dev" >> docker/.env
+            echo "REDIS_HOST=redis" >> docker/.env
+            echo "REDIS_PORT=6379" >> docker/.env
+            echo "FLASK_DEBUG=false" >> docker/.env
+            echo "SUPERSET_LOG_LEVEL=info" >> docker/.env
+            echo "SUPERSET_APP_ROOT=/" >> docker/.env
+            echo "SUPERSET_ENV=production" >> docker/.env
+            echo "SUPERSET_LOAD_EXAMPLES=no" >> docker/.env
+            echo "CYPRESS_CONFIG=false" >> docker/.env
+            echo "SUPERSET_PORT=8088" >> docker/.env
+            echo "SUPERSET_SECRET_KEY=$SUPERSET_SECRET_KEY" >> docker/.env
+            echo "ADMIN_PASSWORD=$ADMIN_PASSWORD" >> docker/.env
+            echo "ENABLE_PLAYWRIGHT=false" >> docker/.env
+            echo "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true" >> docker/.env
+            echo "BUILD_SUPERSET_FRONTEND_IN_DOCKER=true" >> docker/.env
+
+
 
             echo "🛑 Stopping existing containers..."
             docker compose down
