@@ -55,7 +55,7 @@ default_args = {
 dag = DAG(
     dag_id='weather_api_dbt_orchestrator',
     default_args=default_args,
-    schedule=timedelta(hours=1),
+    schedule=timedelta(minutes=20),
     description='Hourly weather forecast ETL pipeline'
 )
 

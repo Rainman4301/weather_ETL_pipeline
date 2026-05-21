@@ -3,17 +3,48 @@ version: 2
 sources:
   - name: dev
     database: db
+    schema: dev
     tables:
       - name: raw_weather_data
+        description: Raw weather data ingested by the Python ETL pipeline
         columns:
           - name: id
+            description: Primary key
           - name: city
+            description: City name
           - name: temperature
+            description: Temperature in Celsius
           - name: weather_description
+            description: Human readable weather condition
           - name: wind_speed
+            description: Wind speed in km/h
+          - name: wind_gust_speed
+            description: Wind gust speed in km/h
           - name: humidity
+            description: Humidity percentage
           - name: pressure
+            description: Atmospheric pressure in hPa
+          - name: visibility
+            description: Visibility in km
+          - name: uv_index
+            description: UV index
+          - name: cloud_cover
+            description: Cloud cover percentage
+          - name: precipitation_prob
+            description: Precipitation probability percentage
+          - name: dew_point
+            description: Dew point in Celsius
+          - name: feels_like
+            description: Feels like temperature in Celsius
+          - name: aqi_index
+            description: Air quality index
+          - name: weather_severity
+            description: Weather severity score
           - name: time
+            description: Timestamp in UTC
           - name: inserted_at
+            description: When the record was inserted by the ETL
           - name: utc_offset
-          - name: is_forecast 
+            description: UTC offset in hours for the city
+          - name: is_forecast
+            description: True if forecast data, False if historical

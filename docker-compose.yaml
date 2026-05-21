@@ -25,7 +25,12 @@ services:
       - ./postgres/data:/var/lib/postgresql/data
       - ./postgres/airflow_init.sql:/docker-entrypoint-initdb.d/airflow_init.sql
       - ./postgres/superset_init.sql:/docker-entrypoint-initdb.d/superset_init.sql
-      - ./postgres/all_roles_configuration.sql:/docker-entrypoint-initdb.d/all_roles_configuration.sql 
+      # - ./postgres/all_roles_configuration.sql:/docker-entrypoint-initdb.d/all_roles_configuration.sql 
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U db_user -d db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - my-network
 
@@ -66,11 +71,12 @@ services:
       DBT_PROFILES_DIR: "/root/.dbt"
       
     depends_on:
-      - db
+      db:
+        condition: service_healthy   # ← waits for healthcheck to pass
     networks:
       - my-network
-    command: 
-      run
+    # command: 
+    #   run
 
 
   superset:
@@ -91,7 +97,7 @@ services:
     environment:
       SUPERSET_LOG_LEVEL: "${SUPERSET_LOG_LEVEL:-info}"
       DATABASE_DB: "superset_db"
-      ENABLE_PROXY_FIX: "true"                                      # 👈 add this
+      ENABLE_PROXY_FIX: "true"                                     
       SUPERSET_CONFIG_PATH: "/app/pythonpath/superset_config.py"
     networks:
       - my-network
