@@ -25,7 +25,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: [0, 100]
+              arguments:
+                values: [0, 100]
               config:
                 where: "avg_humidity >= 0 AND avg_humidity <= 100"
       - name: avg_pressure
@@ -33,7 +34,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: [1000, 1025]
+              arguments:
+                values: [1000, 1025]
               config:
                 where: "avg_pressure >= 1000 AND avg_pressure <= 1025"
       - name: has_forecast_data
@@ -41,4 +43,5 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: [0, 1]
+              arguments:
+                values: [0, 1]
