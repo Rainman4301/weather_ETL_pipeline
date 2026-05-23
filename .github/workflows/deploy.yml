@@ -46,7 +46,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install apache-airflow==3.0.0 dbt-postgres psycopg2-binary requests flake8
+          pip install apache-airflow==3.0.0 dbt-postgres psycopg2-binary requests flake8 pytest
 
       - name: Lint Python files
         run: |
@@ -56,7 +56,7 @@ jobs:
         run: |
           export AIRFLOW_HOME=$(pwd)/airflow
           export AIRFLOW__CORE__LOAD_EXAMPLES=false
-          airflow dags validate airflow/dags/orchestrator.py || true
+          airflow dags list-import-errors || true
 
       - name: Test dbt models (parse)
         run: |
