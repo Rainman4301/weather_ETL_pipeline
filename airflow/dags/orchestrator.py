@@ -66,7 +66,7 @@ with dag:
     )
     task2 = DockerOperator(
         task_id='transform_data_task',
-        image='ghcr.io/dbt-labs/dbt-postgres:1.9.latest',
+        image='ghcr.io/dbt-labs/dbt-postgres:1.9.0',
         command='run',
         working_dir='/usr/app',
         # FIX 1: Disable temporary directory mounting

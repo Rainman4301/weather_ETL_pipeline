@@ -62,7 +62,7 @@ services:
 
   dbt:
     container_name: dbt_container
-    image: ghcr.io/dbt-labs/dbt-postgres:1.9.latest
+    image: ghcr.io/dbt-labs/dbt-postgres:1.9.0
     volumes:
       - ./dbt/myproject:/usr/app
       - ./dbt:/root/.dbt
