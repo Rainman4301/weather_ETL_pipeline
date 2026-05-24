@@ -1,5 +1,5 @@
 {{ config(
-    materialized='table',
+    materialized='incremental',
     unique_key='id'
 ) }}
 
@@ -25,3 +25,7 @@ select
     utc_offset,
     is_forecast
 from {{ source('dev', 'raw_weather_data') }}
+
+{% if is_incremental() %}
+    where inserted_at > (select max(inserted_at) from {{ this }})
+{% endif %}

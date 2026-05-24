@@ -14,8 +14,7 @@ models:
         tests:
           - not_null
           - accepted_values:
-              arguments:
-                values: ['London', 'New York', 'Tokyo', 'Paris', 'Sydney', 'Berlin', 'Toronto', 'Mumbai', 'Dubai', 'Singapore']
+              values: ['London', 'New York', 'Tokyo', 'Paris', 'Sydney', 'Berlin', 'Toronto', 'Mumbai', 'Dubai', 'Singapore']
       - name: temperature
         description: "Temperature in Celsius. Range -50 to 60°C"
         tests:
@@ -25,8 +24,7 @@ models:
         tests:
           - not_null
           - accepted_values:
-              arguments:
-                values: ['Clear', 'Cloudy', 'Rainy', 'Snowy', 'Sunny', 'Foggy', 'Windy', 'Partly Cloudy', 'Thunderstorm', 'Drizzle', 'Hail', 'Sleet']
+              values: ['Clear', 'Cloudy', 'Rainy', 'Snowy', 'Sunny', 'Foggy', 'Windy', 'Partly Cloudy', 'Thunderstorm', 'Drizzle', 'Hail', 'Sleet']
       - name: wind_speed
         description: "Wind speed in km/h. Range 0-25 km/h"
         tests:
@@ -52,5 +50,4 @@ models:
         tests:
           - not_null
           - accepted_values:
-              arguments:
-                values: [true, false]
+              values: [true, false]
