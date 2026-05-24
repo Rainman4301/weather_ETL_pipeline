@@ -55,7 +55,7 @@ default_args = {
 dag = DAG(
     dag_id='weather_api_dbt_orchestrator',
     default_args=default_args,
-    schedule=timedelta(minutes=20),
+    schedule=timedelta(minutes=30),
     description='Hourly weather forecast ETL pipeline'
 )
 
@@ -66,7 +66,7 @@ with dag:
     )
     task2 = DockerOperator(
         task_id='transform_data_task',
-        image='ghcr.io/dbt-labs/dbt-postgres:1.9.latest',
+        image='ghcr.io/dbt-labs/dbt-postgres:1.9.0',
         command='run',
         working_dir='/usr/app',
         # FIX 1: Disable temporary directory mounting

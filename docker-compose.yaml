@@ -1,15 +1,7 @@
 x-superset-user: &superset-user root
 x-superset-volumes: &superset-volumes
-  # /app/pythonpath_docker will be appended to the PYTHONPATH in the final container
   - ./docker:/app/docker
-  # - ./superset:/app/superset
   - ./docker/superset_config.py:/app/pythonpath/superset_config.py
-
-
-
-
-
-
 
 services:
   db:
@@ -25,7 +17,6 @@ services:
       - ./postgres/data:/var/lib/postgresql/data
       - ./postgres/airflow_init.sql:/docker-entrypoint-initdb.d/airflow_init.sql
       - ./postgres/superset_init.sql:/docker-entrypoint-initdb.d/superset_init.sql
-      # - ./postgres/all_roles_configuration.sql:/docker-entrypoint-initdb.d/all_roles_configuration.sql 
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U db_user -d db"]
       interval: 5s
@@ -33,7 +24,6 @@ services:
       retries: 5
     networks:
       - my-network
-
 
   af:
     container_name: airflow_container
@@ -44,45 +34,51 @@ services:
       - ./airflow/.env
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@db:5432/airflow_db
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor        # ← parallel tasks, not dev-only
+      AIRFLOW__CORE__PARALLELISM: 4                 # ← max 4 tasks running at once
+      AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: 2    # ← max 2 tasks per DAG at once
+      DB_HOST: db                                   # ← for insert_records.py
+      DB_PORT: "5432"
+      DB_NAME: db
+      DB_USER: db_user
+      DB_PASSWORD: db_password
+      _AIRFLOW_WWW_USER_USERNAME: admin       # ← set your own username
+      _AIRFLOW_WWW_USER_PASSWORD: rainman4301 # ← set your own password
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./api_request:/opt/airflow/api_request
       - ./airflow/.env:/opt/airflow/.env
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:
-      - "1001"  # Add the airflow user to the root group to access the Docker socket
+      - "1001"
       - "988"
     depends_on:
-      - db
+      db:
+        condition: service_healthy                  # ← wait for DB before starting
     networks:
       - my-network
     command: >
       bash -c "airflow db migrate && airflow standalone"
 
-    
   dbt:
     container_name: dbt_container
-    image: ghcr.io/dbt-labs/dbt-postgres:1.9.latest
+    image: ghcr.io/dbt-labs/dbt-postgres:1.9.0
     volumes:
       - ./dbt/myproject:/usr/app
       - ./dbt:/root/.dbt
     working_dir: /usr/app
     environment:
       DBT_PROFILES_DIR: "/root/.dbt"
-      
     depends_on:
       db:
-        condition: service_healthy   # ← waits for healthcheck to pass
+        condition: service_healthy
     networks:
       - my-network
-    # command: 
-    #   run
-
 
   superset:
     container_name: superset_container
     env_file:
-      - path: docker/.env # default
+      - path: docker/.env
         required: true
     image: apache/superset:3.0.0-py310
     command: ["/app/docker/docker-bootstrap.sh", "app"]
@@ -97,18 +93,17 @@ services:
     environment:
       SUPERSET_LOG_LEVEL: "${SUPERSET_LOG_LEVEL:-info}"
       DATABASE_DB: "superset_db"
-      ENABLE_PROXY_FIX: "true"                                     
+      ENABLE_PROXY_FIX: "true"
       SUPERSET_CONFIG_PATH: "/app/pythonpath/superset_config.py"
     networks:
       - my-network
-
 
   superset-init:
     container_name: superset_init_container
     image: apache/superset:3.0.0-py310
     command: ["/app/docker/docker-init.sh"]
     env_file:
-      - path: docker/.env # default
+      - path: docker/.env
         required: true
     depends_on:
       db:
@@ -135,11 +130,10 @@ services:
       - redis:/data
     networks:
       - my-network
-  
+
 networks:
   my-network:
     driver: bridge
-      
 
 volumes:
   redis:

@@ -3,17 +3,6 @@ import os
 
 
 
-# env_file:
-#       - path: docker/.env # default
-#         required: true
-#     environment:
-#       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@db:5432/airflow_db
-#       WEATHER_API_KEY: ${WEATHER_API_KEY}
-#       WEATHER_API_BASE_URL: ${WEATHER_API_BASE_URL}
-#       WEATHER_API_CITY: ${WEATHER_API_CITY}
-
-
-
 
 
 # Get configuration from environment variables
@@ -21,15 +10,18 @@ API_KEY = os.getenv('WEATHER_API_KEY')
 API_BASE_URL = os.getenv('WEATHER_API_BASE_URL')
 CITY = os.getenv('WEATHER_API_CITY')
 
-# Validate configuration
-if not API_KEY:
-    raise ValueError("WEATHER_API_KEY environment variable is not set!")
-if not API_BASE_URL:
-    raise ValueError("WEATHER_API_BASE_URL environment variable is not set!")
 
-api_url = f"{API_BASE_URL}?access_key={API_KEY}&query={CITY}"
 
 def fetch_data(city=None):
+
+    # Validate configuration
+    if not API_KEY:
+        raise ValueError("WEATHER_API_KEY environment variable is not set!")
+    if not API_BASE_URL:
+        raise ValueError("WEATHER_API_BASE_URL environment variable is not set!")
+
+    api_url = f"{API_BASE_URL}?access_key={API_KEY}&query={CITY}"
+
     """
     Fetch weather data from weatherstack API
     

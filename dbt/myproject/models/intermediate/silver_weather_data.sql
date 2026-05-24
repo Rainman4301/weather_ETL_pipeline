@@ -1,10 +1,23 @@
 {{ config(
-    materialized='table',
+    materialized='incremental',
     unique_key='id'
 ) }}
 
-with source as (
-    select * from {{ ref('stg_weather_data') }}
+with max_inserted as (
+    {% if is_incremental() %}
+        select max(inserted_at_local) as max_ts from {{ this }}
+    {% else %}
+        select null::timestamp as max_ts
+    {% endif %}
+),
+
+source as (
+    select s.*
+    from {{ ref('stg_weather_data') }} s
+    cross join max_inserted m
+    {% if is_incremental() %}
+        where s.inserted_at > m.max_ts
+    {% endif %}
 ),
 
 with_local_time as (
@@ -14,18 +27,10 @@ with_local_time as (
     from source
 ),
 
-filtered_data as (
-    select *
-    from with_local_time
-    where
-        is_forecast = TRUE
-        or (is_forecast = FALSE and time_local_tz > (now() AT TIME ZONE 'UTC' - interval '1 day'))
-),
-
 de_dup as (
     select *,
         row_number() over (partition by city, time order by inserted_at desc) as rn
-    from filtered_data
+    from with_local_time
 )
 
 select
