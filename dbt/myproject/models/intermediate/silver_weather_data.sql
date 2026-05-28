@@ -1,6 +1,7 @@
 {{ config(
     materialized='incremental',
-    unique_key='id'
+    unique_key='id',
+    post_hook="DELETE FROM {{ this }} WHERE inserted_at_local < NOW() - INTERVAL '30 days'"
 ) }}
 
 with max_inserted as (
