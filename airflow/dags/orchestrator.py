@@ -1,6 +1,7 @@
 import sys
+import os
 # run in container
-sys.path.append('/opt/airflow/api_request')
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../api_request'))
 from insert_records import *
 
 
@@ -11,7 +12,7 @@ from datetime import datetime, timedelta
 from docker.types import Mount
 
 
-import os
+
 import docker
 def get_host_repo_path():
     """

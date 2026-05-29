@@ -48,6 +48,8 @@ services:
       - ./airflow/dags:/opt/airflow/dags
       - ./api_request:/opt/airflow/api_request
       - ./airflow/.env:/opt/airflow/.env
+      - ./requirements.txt:/requirements.txt
+      - af_pip_cache:/root/.cache/pip
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:
       - "1001"
@@ -58,7 +60,10 @@ services:
     networks:
       - my-network
     command: >
-      bash -c "airflow db migrate && airflow standalone"
+      bash -c " pip install -r /requirements.txt &&
+                airflow db migrate &&
+                airflow standalone
+              "
 
   dbt:
     container_name: dbt_container
@@ -136,5 +141,6 @@ networks:
     driver: bridge
 
 volumes:
+  af_pip_cache:
   redis:
     external: false
