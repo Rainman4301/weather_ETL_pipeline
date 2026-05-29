@@ -57,10 +57,8 @@ jobs:
           export AIRFLOW_HOME=$(pwd)/airflow
           export AIRFLOW__CORE__LOAD_EXAMPLES=false
           export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://test_user:test_password@localhost:5432/test_db
+          export PYTHONPATH=$(pwd)/api_request:$PYTHONPATH
           airflow db migrate
-          echo "DAGs folder contents:"
-          ls -la $(pwd)/airflow/dags/        # ← add this
-          python $(pwd)/airflow/dags/orchestrator.py
           airflow dags list-import-errors || true
 
       - name: Test dbt models (parse)
