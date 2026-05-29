@@ -64,6 +64,7 @@ jobs:
           import sys
           sys.path.insert(0, '$(pwd)/api_request')
           sys.path.insert(0, '$(pwd)')
+          sys.path.insert(0, '$(pwd)/airflow/dags')
           print('sys.path:', sys.path[:4])
           import insert_records
           print('insert_records imported OK')
