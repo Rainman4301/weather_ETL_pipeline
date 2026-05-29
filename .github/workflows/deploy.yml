@@ -60,6 +60,7 @@ jobs:
           airflow db migrate
           echo "DAGs folder contents:"
           ls -la $(pwd)/airflow/dags/        # ← add this
+          python $(pwd)/airflow/dags/orchestrator.py
           airflow dags list-import-errors || true
 
       - name: Test dbt models (parse)
