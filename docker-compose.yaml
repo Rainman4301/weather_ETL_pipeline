@@ -5,6 +5,7 @@ x-superset-volumes: &superset-volumes
 
 services:
   db:
+    mem_limit: 512m
     container_name: postgres_container
     image: postgres:14.17
     ports:
@@ -26,8 +27,10 @@ services:
       - my-network
 
   af:
+    mem_limit: 1.5g
     container_name: airflow_container
     image: apache/airflow:3.0.0
+    user: root
     ports:
       - "8000:8080"
     env_file:
@@ -44,12 +47,14 @@ services:
       DB_PASSWORD: db_password
       _AIRFLOW_WWW_USER_USERNAME: admin       # ← set your own username
       _AIRFLOW_WWW_USER_PASSWORD: rainman4301 # ← set your own password
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64    # ← add this
+      HOST_REPO_PATH: ${HOST_REPO_PATH}
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./api_request:/opt/airflow/api_request
       - ./airflow/.env:/opt/airflow/.env
       - ./requirements.txt:/requirements.txt
-      - af_pip_cache:/root/.cache/pip
+      - af_pip_cache:/tmp/.cache/pip
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:
       - "1001"
@@ -60,10 +65,15 @@ services:
     networks:
       - my-network
     command: >
-      bash -c " pip install -r /requirements.txt &&
-                airflow db migrate &&
-                airflow standalone
-              "
+      bash -c "
+        apt-get update -qq &&
+        apt-get install -y -qq default-jdk &&
+        mkdir -p /tmp/.cache/pip &&
+        chown -R airflow: /tmp/.cache/pip &&
+        su -s /bin/bash airflow -c 'pip install -r /requirements.txt' &&
+        airflow db migrate &&
+        airflow standalone
+      "
 
   dbt:
     container_name: dbt_container
@@ -81,6 +91,7 @@ services:
       - my-network
 
   superset:
+    mem_limit: 800m
     container_name: superset_container
     env_file:
       - path: docker/.env
@@ -127,6 +138,7 @@ services:
       - my-network
 
   redis:
+    mem_limit: 256m
     image: redis:7
     restart: unless-stopped
     ports:

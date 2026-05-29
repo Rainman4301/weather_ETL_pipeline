@@ -283,7 +283,7 @@ def insert_chunk(conn_params, chunk, chunk_id, total):
                 r.wind_gust_speed, r.humidity, r.pressure, r.visibility,
                 r.uv_index, r.cloud_cover, r.precipitation_prob, r.dew_point,
                 r.feels_like, r.aqi_index, r.weather_severity,
-                r.time.to_pydatetime(),
+                r.time,
                 r.utc_offset, r.is_forecast
             )
             for r in chunk

@@ -169,7 +169,7 @@ jobs:
             echo "ENABLE_PLAYWRIGHT=false" >> docker/.env
             echo "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true" >> docker/.env
             echo "BUILD_SUPERSET_FRONTEND_IN_DOCKER=true" >> docker/.env
-
+            echo "HOST_REPO_PATH=$HOME/weather_ETL_pipeline" > .env
 
 
             echo "🛑 Stopping existing containers..."
