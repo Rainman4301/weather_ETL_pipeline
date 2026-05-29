@@ -59,7 +59,19 @@ jobs:
           export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://test_user:test_password@localhost:5432/test_db
           export PYTHONPATH=$(pwd)/api_request:$(pwd):$PYTHONPATH
           airflow db migrate
-          airflow dags list-import-errors || true
+          echo "--- Direct Python import test ---"
+          python -c "
+          import sys
+          sys.path.insert(0, '$(pwd)/api_request')
+          sys.path.insert(0, '$(pwd)')
+          print('sys.path:', sys.path[:4])
+          import insert_records
+          print('insert_records imported OK')
+          import orchestrator
+          print('orchestrator imported OK')
+          " 2>&1 || true
+              echo "--- Airflow DAG check ---"
+              airflow dags list-import-errors || true
 
       - name: Test dbt models (parse)
         run: |
