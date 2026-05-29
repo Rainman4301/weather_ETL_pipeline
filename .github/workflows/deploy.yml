@@ -57,7 +57,7 @@ jobs:
           export AIRFLOW_HOME=$(pwd)/airflow
           export AIRFLOW__CORE__LOAD_EXAMPLES=false
           export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://test_user:test_password@localhost:5432/test_db
-          export PYTHONPATH=$(pwd)/api_request:$PYTHONPATH
+          export PYTHONPATH=$(pwd)/api_request:$(pwd):$PYTHONPATH
           airflow db migrate
           airflow dags list-import-errors || true
 
