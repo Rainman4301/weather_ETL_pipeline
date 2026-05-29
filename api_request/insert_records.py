@@ -4,12 +4,18 @@ import os
 import random
 from datetime import datetime, timedelta
 
-from pyspark.sql import SparkSession
-from pyspark.sql.types import (
-    StructType, StructField, StringType, FloatType,
-    IntegerType, TimestampType, BooleanType
-)
-from pyspark.sql import functions as F
+try:
+    from pyspark.sql import SparkSession
+    from pyspark.sql.types import (
+        StructType, StructField, StringType, FloatType,
+        IntegerType, TimestampType, BooleanType
+    )
+    from pyspark.sql import functions as F
+    PYSPARK_AVAILABLE = True
+except ImportError:
+    PYSPARK_AVAILABLE = False
+
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
@@ -359,6 +365,8 @@ def main(use_random_data=True, days_ahead=7):
         conn.close()
 
     if use_random_data:
+        if not PYSPARK_AVAILABLE:
+            raise RuntimeError("PySpark is not installed. Run: pip install pyspark==3.5.3")
         spark = get_spark()
         try:
             print("--- Step 1: Generating records in parallel ---")
