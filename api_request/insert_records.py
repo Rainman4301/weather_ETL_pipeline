@@ -12,8 +12,30 @@ try:
     )
     from pyspark.sql import functions as F
     PYSPARK_AVAILABLE = True
+
+    WEATHER_SCHEMA = StructType([
+        StructField("city",                StringType(),   True),
+        StructField("temperature",         FloatType(),    True),
+        StructField("weather_description", StringType(),   True),
+        StructField("wind_speed",          FloatType(),    True),
+        StructField("wind_gust_speed",     FloatType(),    True),
+        StructField("humidity",            FloatType(),    True),
+        StructField("pressure",            FloatType(),    True),
+        StructField("visibility",          FloatType(),    True),
+        StructField("uv_index",            FloatType(),    True),
+        StructField("cloud_cover",         FloatType(),    True),
+        StructField("precipitation_prob",  FloatType(),    True),
+        StructField("dew_point",           FloatType(),    True),
+        StructField("feels_like",          FloatType(),    True),
+        StructField("aqi_index",           FloatType(),    True),
+        StructField("weather_severity",    IntegerType(),  True),
+        StructField("time",                TimestampType(), True),
+        StructField("utc_offset",          StringType(),   True),
+        StructField("is_forecast",         BooleanType(),  True),
+    ])
 except ImportError:
     PYSPARK_AVAILABLE = False
+    WEATHER_SCHEMA = None
 
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -37,26 +59,6 @@ def get_spark():
     )
 
 
-WEATHER_SCHEMA = StructType([
-    StructField("city",                StringType(),   True),
-    StructField("temperature",         FloatType(),    True),
-    StructField("weather_description", StringType(),   True),
-    StructField("wind_speed",          FloatType(),    True),
-    StructField("wind_gust_speed",     FloatType(),    True),
-    StructField("humidity",            FloatType(),    True),
-    StructField("pressure",            FloatType(),    True),
-    StructField("visibility",          FloatType(),    True),
-    StructField("uv_index",            FloatType(),    True),
-    StructField("cloud_cover",         FloatType(),    True),
-    StructField("precipitation_prob",  FloatType(),    True),
-    StructField("dew_point",           FloatType(),    True),
-    StructField("feels_like",          FloatType(),    True),
-    StructField("aqi_index",           FloatType(),    True),
-    StructField("weather_severity",    IntegerType(),  True),
-    StructField("time",                TimestampType(), True),
-    StructField("utc_offset",          StringType(),   True),
-    StructField("is_forecast",         BooleanType(),  True),
-])
 
 
 def transform_with_spark(records, spark):
