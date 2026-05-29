@@ -2,6 +2,8 @@ import sys
 import os
 # run in container
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../api_request'))
+# fix vm path
+sys.path.append('/opt/airflow/api_request')
 from insert_records import *
 
 
