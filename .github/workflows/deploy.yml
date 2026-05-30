@@ -172,6 +172,9 @@ jobs:
             echo "HOST_REPO_PATH=/home/$AZURE_VM_USER/weather_ETL_pipeline" > .env
 
 
+            echo "🔨 Building images..."
+            docker compose build af
+
             echo "🛑 Stopping existing containers..."
             docker compose down
 

@@ -27,32 +27,34 @@ services:
 
   af:
     container_name: airflow_container
-    image: apache/airflow:3.0.0
-    user: root
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
     ports:
       - "8000:8080"
     env_file:
       - ./airflow/.env
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@db:5432/airflow_db
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor        # ← parallel tasks, not dev-only
-      AIRFLOW__CORE__PARALLELISM: 4                 # ← max 4 tasks running at once
-      AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: 2    # ← max 2 tasks per DAG at once
-      DB_HOST: db                                   # ← for insert_records.py
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__PARALLELISM: 4
+      AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: 2
+      DB_HOST: db
       DB_PORT: "5432"
       DB_NAME: db
       DB_USER: db_user
       DB_PASSWORD: db_password
-      _AIRFLOW_WWW_USER_USERNAME: admin       # ← set your own username
-      _AIRFLOW_WWW_USER_PASSWORD: rainman4301 # ← set your own password
-      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64    # ← add this
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: rainman4301
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
       HOST_REPO_PATH: ${HOST_REPO_PATH}
+      PIP_CACHE_DIR: /home/airflow/.cache/pip
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./api_request:/opt/airflow/api_request
       - ./airflow/.env:/opt/airflow/.env
       - ./requirements.txt:/requirements.txt
-      - af_pip_cache:/tmp/.cache/pip
+      - af_pip_cache:/home/airflow/.cache/pip
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:
       - "1001"
@@ -60,16 +62,12 @@ services:
     mem_limit: 1.5g
     depends_on:
       db:
-        condition: service_healthy                  # ← wait for DB before starting
+        condition: service_healthy
     networks:
       - my-network
     command: >
       bash -c "
-        apt-get update -qq &&
-        apt-get install -y -qq default-jdk &&
-        mkdir -p /tmp/.cache/pip &&
-        chown -R airflow: /tmp/.cache/pip &&
-        su -s /bin/bash airflow -c 'pip install -r /requirements.txt' &&
+        pip install -r /requirements.txt &&
         airflow db migrate &&
         airflow standalone
       "
