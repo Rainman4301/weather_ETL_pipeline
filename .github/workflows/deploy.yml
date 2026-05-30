@@ -46,7 +46,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install apache-airflow==3.0.0 dbt-postgres==1.9.0 psycopg2-binary requests flake8 pytest asyncpg
+          pip install apache-airflow==3.0.0 dbt-postgres==1.9.0 psycopg2-binary requests flake8 pytest asyncpg docker apache-airflow-providers-docker
 
       - name: Lint Python files
         run: |
@@ -57,7 +57,10 @@ jobs:
           export AIRFLOW_HOME=$(pwd)/airflow
           export AIRFLOW__CORE__LOAD_EXAMPLES=false
           export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://test_user:test_password@localhost:5432/test_db
+          export AIRFLOW__CORE__DAGS_FOLDER=$(pwd)/airflow/dags
+          export PYTHONPATH=$(pwd)/api_request:$(pwd):$(pwd)/airflow/dags:$PYTHONPATH
           airflow db migrate
+          echo "--- Airflow DAG check ---"
           airflow dags list-import-errors || true
 
       - name: Test dbt models (parse)
@@ -166,7 +169,7 @@ jobs:
             echo "ENABLE_PLAYWRIGHT=false" >> docker/.env
             echo "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true" >> docker/.env
             echo "BUILD_SUPERSET_FRONTEND_IN_DOCKER=true" >> docker/.env
-
+            echo "HOST_REPO_PATH=/home/$AZURE_VM_USER/weather_ETL_pipeline" > .env
 
 
             echo "🛑 Stopping existing containers..."

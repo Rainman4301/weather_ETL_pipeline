@@ -1,5 +1,8 @@
 import sys
+import os
 # run in container
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../api_request'))
+# fix vm path
 sys.path.append('/opt/airflow/api_request')
 from insert_records import *
 
@@ -11,13 +14,20 @@ from datetime import datetime, timedelta
 from docker.types import Mount
 
 
-import os
+
 import docker
 def get_host_repo_path():
     """
     Finds the host path by looking at the /opt/airflow/dags mount
     and stripping the sub-path to find the project root.
     """
+    
+    # 1. Prefer explicit env var (works on both WSL and Azure VM)
+    env_path = os.environ.get('HOST_REPO_PATH')
+    if env_path:
+        return env_path
+    
+    # 2. Fall back to dynamic discovery (works on Linux/Azure VM but not WSL with user:root)
     try:
         client = docker.from_env()
         container_id = os.environ.get('HOSTNAME')
@@ -36,8 +46,9 @@ def get_host_repo_path():
                 
     except Exception as e:
         print(f"Dynamic path discovery failed: {e}")
-        return '/opt/airflow' # Last resort fallback
-    return '/opt/airflow'
+        raise RuntimeError("Could not determine HOST_REPO_PATH. Set it as an env var.")
+    
+    raise RuntimeError("Could not determine HOST_REPO_PATH. Set it as an env var.")
 
 # Get the host path dynamically
 HOST_REPO_PATH = get_host_repo_path()
