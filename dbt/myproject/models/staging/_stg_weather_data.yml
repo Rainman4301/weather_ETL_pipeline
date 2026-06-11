@@ -1,0 +1,85 @@
+version: 2
+
+models:
+  - name: stg_weather_data
+    description: Staging layer for raw weather data with light transformations
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id
+        description: Primary key from source
+        data_type: bigint
+        tests:
+          - unique
+          - not_null
+      - name: city
+        description: City name
+        data_type: varchar
+        tests:
+          - not_null
+      - name: temperature
+        description: Temperature in Celsius
+        data_type: numeric
+        tests:
+          - not_null
+      - name: weather_description
+        description: Human readable weather condition
+        data_type: varchar
+        tests:
+          - accepted_values:
+              values: ['Sunny', 'Cloudy', 'Rainy', 'Snowy', 'Stormy', 'Foggy', 'Partly Cloudy', 'Clear', 'Overcast', 'Drizzle', 'Thunderstorm', 'Snow', 'Sleet', 'Hail', 'Mist', 'Smoke', 'Dust', 'Sand', 'Ash', 'Squall', 'Tornado']
+              config:
+                severity: warn
+      - name: wind_speed
+        description: Wind speed in km/h
+        data_type: numeric
+      - name: wind_gust_speed
+        description: Wind gust speed in km/h
+        data_type: numeric
+      - name: humidity
+        description: Humidity percentage
+        data_type: numeric
+      - name: pressure
+        description: Atmospheric pressure in hPa
+        data_type: numeric
+      - name: visibility
+        description: Visibility in km
+        data_type: numeric
+      - name: uv_index
+        description: UV index
+        data_type: numeric
+      - name: cloud_cover
+        description: Cloud cover percentage
+        data_type: numeric
+      - name: precipitation_prob
+        description: Precipitation probability percentage
+        data_type: numeric
+      - name: dew_point
+        description: Dew point in Celsius
+        data_type: numeric
+      - name: feels_like
+        description: Feels like temperature in Celsius
+        data_type: numeric
+      - name: aqi_index
+        description: Air quality index
+        data_type: numeric
+      - name: weather_severity
+        description: Weather severity score
+        data_type: numeric
+        tests:
+          - not_null
+      - name: time
+        description: Timestamp in UTC
+        data_type: timestamp
+        tests:
+          - not_null
+      - name: inserted_at
+        description: When the record was inserted by the ETL
+        data_type: timestamp
+      - name: utc_offset
+        description: UTC offset in hours for the city
+        data_type: integer
+      - name: is_forecast
+        description: True if forecast data, False if historical
+        data_type: boolean

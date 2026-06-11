@@ -1,7 +1,8 @@
 {{ config(
     materialized='incremental',
     unique_key='id',
-    post_hook="DELETE FROM {{ this }} WHERE inserted_at < NOW() - INTERVAL '30 days'"
+    post_hook="DELETE FROM {{ this }} WHERE inserted_at < NOW() - INTERVAL '30 days'",
+    contract={"enforced": true}
 ) }}
 
 select

@@ -313,9 +313,16 @@ docker logs <container_name> --tail 30
 
 ## Documentation
 
-- [GITHUB_SECRETS_SETUP.md](GITHUB_SECRETS_SETUP.md) — all 10 required secrets and how to get them
-- [DEVELOPMENT_AND_DEPLOYMENT_GUIDE.md](DEVELOPMENT_AND_DEPLOYMENT_GUIDE.md) — full local setup walkthrough, CI/CD details, and Azure VM provisioning
-- [GITIGNORE_GUIDE.md](GITIGNORE_GUIDE.md) — what's ignored and why
+**Essential (root level):**
+- [DEVELOPMENT_AND_DEPLOYMENT_GUIDE.md](DEVELOPMENT_AND_DEPLOYMENT_GUIDE.md) — full local setup, CI/CD, Azure VM provisioning
+
+**Complete guides (see `docs/` folder):**
+- [docs/GITHUB_SECRETS_SETUP.md](docs/GITHUB_SECRETS_SETUP.md) — required secrets & setup
+- [docs/GITIGNORE_GUIDE.md](docs/GITIGNORE_GUIDE.md) — what's ignored & why
+- [docs/IMPLEMENTATION_INDEX.md](docs/IMPLEMENTATION_INDEX.md) — architecture & file reference
+- [docs/QUICK_START.md](docs/QUICK_START.md) — 2-min implementation overview
+- [docs/RELIABILITY_AND_INTEGRITY_GUIDE.md](docs/RELIABILITY_AND_INTEGRITY_GUIDE.md) — retry/timeout/validation details
+- [docs/IMPLEMENTATION_CHECKLIST.md](docs/IMPLEMENTATION_CHECKLIST.md) — deployment verification steps
 
 ---
 

@@ -4,18 +4,34 @@ sources:
   - name: dev
     database: db
     schema: dev
+    freshness:
+      warn_after: {count: 90, period: minute}
+      error_after: {count: 120, period: minute}
+    loaded_at_field: inserted_at
     tables:
       - name: raw_weather_data
         description: Raw weather data ingested by the Python ETL pipeline
         columns:
           - name: id
             description: Primary key
+            tests:
+              - unique
+              - not_null
           - name: city
             description: City name
+            tests:
+              - not_null
           - name: temperature
             description: Temperature in Celsius
+            tests:
+              - not_null
           - name: weather_description
             description: Human readable weather condition
+            tests:
+              - accepted_values:
+                  values: ['Sunny', 'Cloudy', 'Rainy', 'Snowy', 'Stormy', 'Foggy', 'Partly Cloudy', 'Clear', 'Overcast', 'Drizzle', 'Thunderstorm', 'Snow', 'Sleet', 'Hail', 'Mist', 'Smoke', 'Dust', 'Sand', 'Ash', 'Squall', 'Tornado']
+                  config:
+                    severity: warn
           - name: wind_speed
             description: Wind speed in km/h
           - name: wind_gust_speed
@@ -40,8 +56,12 @@ sources:
             description: Air quality index
           - name: weather_severity
             description: Weather severity score
+            tests:
+              - not_null
           - name: time
             description: Timestamp in UTC
+            tests:
+              - not_null
           - name: inserted_at
             description: When the record was inserted by the ETL
           - name: utc_offset

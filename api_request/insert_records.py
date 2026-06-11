@@ -3,6 +3,12 @@ import psycopg2
 import os
 import random
 from datetime import datetime, timedelta
+import functools
+import time
+import logging
+import signal
+from contextlib import contextmanager
+from typing import List, Any
 
 try:
     from pyspark.sql import SparkSession
@@ -43,6 +49,81 @@ import threading
 
 
 # ─────────────────────────────────────────
+# LOGGING & ERROR HANDLING
+# ─────────────────────────────────────────
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+
+class TimeoutError(Exception):
+    """Raised when an operation exceeds its timeout."""
+    pass
+
+
+@contextmanager
+def timeout_context(seconds, operation_name="operation"):
+    """Context manager for timeout using signal.SIGALRM."""
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f"{operation_name} exceeded {seconds}s timeout")
+    
+    # Set the signal handler and alarm
+    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)  # Cancel the alarm
+        signal.signal(signal.SIGALRM, old_handler)
+
+
+def retry_with_backoff(max_retries=3, base_delay=5, max_delay=60):
+    """
+    Decorator for retrying a function with exponential backoff.
+    
+    Args:
+        max_retries: Maximum number of retry attempts (default: 3)
+        base_delay: Initial delay in seconds (default: 5)
+        max_delay: Maximum delay between retries in seconds (default: 60)
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            attempt = 0
+            last_exception = None
+            
+            while attempt <= max_retries:
+                try:
+                    if attempt > 0:
+                        logger.info(f"Retry attempt {attempt}/{max_retries} for {func.__name__}")
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    attempt += 1
+                    
+                    if attempt <= max_retries:
+                        delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+                        logger.warning(
+                            f"{func.__name__} failed (attempt {attempt}/{max_retries}): {type(e).__name__}: {str(e)}. "
+                            f"Retrying in {delay}s..."
+                        )
+                        time.sleep(delay)
+                    else:
+                        logger.error(
+                            f"{func.__name__} failed after {max_retries} retries: {type(e).__name__}: {str(e)}"
+                        )
+            
+            raise last_exception
+        
+        return wrapper
+    return decorator
+
+
+# ─────────────────────────────────────────
 # SPARK
 # ─────────────────────────────────────────
 
@@ -59,6 +140,39 @@ def get_spark():
     )
 
 
+def validate_records(records: List[Any]) -> bool:
+    """
+    Validate that records match the WEATHER_SCHEMA using Spark.
+    
+    Args:
+        records: List of Row objects or tuples to validate
+        
+    Returns:
+        True if all records are valid
+        
+    Raises:
+        ValueError: If records don't match the schema
+    """
+    if not PYSPARK_AVAILABLE:
+        logger.warning("PySpark not available, skipping schema validation")
+        return True
+    
+    if not records:
+        logger.debug("No records to validate")
+        return True
+    
+    try:
+        spark = get_spark()
+        try:
+            df = spark.createDataFrame(records, schema=WEATHER_SCHEMA)
+            row_count = df.count()
+            logger.info(f"Schema validation passed for {row_count} records")
+            return True
+        finally:
+            spark.stop()
+    except Exception as e:
+        logger.error(f"Schema validation failed: {type(e).__name__}: {str(e)}")
+        raise ValueError(f"Records do not match WEATHER_SCHEMA: {str(e)}")
 
 
 def transform_with_spark(records, spark):
@@ -264,39 +378,68 @@ def generate_parallel(days_ahead=7, hours_historical=24, max_workers=4):
 # INSERTION (parallel by chunk)
 # ─────────────────────────────────────────
 
+@retry_with_backoff(max_retries=3, base_delay=5, max_delay=60)
 def insert_chunk(conn_params, chunk, chunk_id, total):
-    """Insert a single chunk — each thread gets its own connection."""
-    conn = psycopg2.connect(**conn_params)
+    """
+    Insert a single chunk — each thread gets its own connection.
+    Retries with exponential backoff on database errors.
+    Validates records before insertion and uses timeout protection.
+    """
+    chunk_size = len(chunk)
+    logger.debug(f"Processing chunk {chunk_id}/{total} with {chunk_size} records")
+    
+    # Validate records before attempting insertion
     try:
-        cursor = conn.cursor()
-        insert_sql = """
-            INSERT INTO dev.raw_weather_data (
-                city, temperature, weather_description, wind_speed, wind_gust_speed,
-                humidity, pressure, visibility, uv_index, cloud_cover, precipitation_prob,
-                dew_point, feels_like, aqi_index, weather_severity, time,
-                inserted_at, utc_offset, is_forecast
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW(),%s,%s)
-        """
-        rows = [
-            (
-                r.city, r.temperature, r.weather_description, r.wind_speed,
-                r.wind_gust_speed, r.humidity, r.pressure, r.visibility,
-                r.uv_index, r.cloud_cover, r.precipitation_prob, r.dew_point,
-                r.feels_like, r.aqi_index, r.weather_severity,
-                r.time,
-                r.utc_offset, r.is_forecast
-            )
-            for r in chunk
-        ]
-        cursor.executemany(insert_sql, rows)
-        conn.commit()
-        print(f"  Chunk {chunk_id}/{total}: {len(rows)} rows inserted")
-        cursor.close()
+        validate_records(chunk)
+    except ValueError as e:
+        logger.error(f"Chunk {chunk_id} validation failed: {str(e)}")
+        raise
+    
+    conn = None
+    try:
+        # Use timeout context for connection and insertion
+        with timeout_context(seconds=30, operation_name=f"chunk_{chunk_id}_insert"):
+            conn = psycopg2.connect(**conn_params)
+            cursor = conn.cursor()
+            
+            insert_sql = """
+                INSERT INTO dev.raw_weather_data (
+                    city, temperature, weather_description, wind_speed, wind_gust_speed,
+                    humidity, pressure, visibility, uv_index, cloud_cover, precipitation_prob,
+                    dew_point, feels_like, aqi_index, weather_severity, time,
+                    inserted_at, utc_offset, is_forecast
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW(),%s,%s)
+            """
+            rows = [
+                (
+                    r.city, r.temperature, r.weather_description, r.wind_speed,
+                    r.wind_gust_speed, r.humidity, r.pressure, r.visibility,
+                    r.uv_index, r.cloud_cover, r.precipitation_prob, r.dew_point,
+                    r.feels_like, r.aqi_index, r.weather_severity,
+                    r.time,
+                    r.utc_offset, r.is_forecast
+                )
+                for r in chunk
+            ]
+            cursor.executemany(insert_sql, rows)
+            conn.commit()
+            logger.info(f"Chunk {chunk_id}/{total}: {len(rows)} rows inserted successfully")
+            cursor.close()
+    except TimeoutError as e:
+        logger.error(f"Chunk {chunk_id} timeout: {str(e)}")
+        raise
     except psycopg2.Error as e:
-        print(f"  Chunk {chunk_id} failed: {e}")
+        logger.error(f"Chunk {chunk_id} database error: {type(e).__name__}: {str(e)}")
+        raise
+    except Exception as e:
+        logger.error(f"Chunk {chunk_id} unexpected error: {type(e).__name__}: {str(e)}")
         raise
     finally:
-        conn.close()
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception as e:
+                logger.warning(f"Error closing connection for chunk {chunk_id}: {str(e)}")
 
 
 def insert_parallel(rows, conn_params, num_threads=3, chunk_size=1000):
