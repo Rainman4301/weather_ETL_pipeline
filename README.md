@@ -8,6 +8,8 @@ A production-grade weather data pipeline running on Azure VM — ingesting data 
 
 ## Architecture
 
+![Architecture and CI/CD workflow diagram](architecture-diagram.png)
+
 ```
 WeatherStack API
       |
