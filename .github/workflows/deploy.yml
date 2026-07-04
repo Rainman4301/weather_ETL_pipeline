@@ -185,7 +185,7 @@ jobs:
             docker compose up -d
 
             echo "⏳ Waiting for services to start..."
-            sleep 30
+            sleep 40
 
             echo "✅ Service status:"
             docker compose ps
@@ -203,8 +203,36 @@ jobs:
           ssh -o StrictHostKeyChecking=no $AZURE_VM_USER@$AZURE_VM_HOST << 'EOF'
             echo "🔍 Verifying services..."
             docker compose ps
-            echo "Airflow:  http://localhost:8000"
-            echo "Superset: http://localhost:8088"
+
+            # Airflow health check
+            echo "Checking Airflow..."
+            for i in {1..5}; do
+              if curl -sf http://localhost:8080/health | grep -q '"status": "healthy"'; then
+                echo "✅ Airflow is healthy"
+                break
+              fi
+              echo "⏳ Attempt $i failed, retrying in 10s..."
+              sleep 10
+              if [ $i -eq 5 ]; then
+                echo "❌ Airflow health check failed"
+                exit 1
+              fi
+            done
+
+            # Superset health check
+            echo "Checking Superset..."
+            for i in {1..5}; do
+              if curl -sf http://localhost:8088/health | grep -q "OK"; then
+                echo "✅ Superset is healthy"
+                break
+              fi
+              echo "⏳ Attempt $i failed, retrying in 10s..."
+              sleep 10
+              if [ $i -eq 5 ]; then
+                echo "❌ Superset health check failed"
+                exit 1
+              fi
+            done
           EOF
 
   # ============================================
