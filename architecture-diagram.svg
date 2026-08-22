@@ -1,0 +1,106 @@
+<svg viewBox="0 0 1660 1720" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555555"/>
+    </marker>
+  </defs>
+
+  <rect width="1660" height="1720" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="60" y="65" font-size="40" font-weight="bold" fill="#1a1a1a">Weather ETL Pipeline</text>
+  <text x="60" y="98" font-size="18" fill="#666666">Architecture and CI/CD workflow</text>
+
+  <!-- CI/CD section label -->
+  <text x="60" y="165" font-size="21" font-weight="bold" fill="#1a1a1a">CI/CD pipeline — GitHub Actions</text>
+
+  <!-- CI/CD boxes -->
+  <g font-size="17">
+    <rect x="60" y="190" width="360" height="100" rx="10" fill="#fbe4ec" stroke="#c2185b" stroke-width="2"/>
+    <text x="80" y="230" font-weight="bold" fill="#8e1550">Push / pull request</text>
+    <text x="80" y="258" fill="#8e1550">Code pushed to branch</text>
+
+    <rect x="460" y="190" width="360" height="100" rx="10" fill="#fbe4ec" stroke="#c2185b" stroke-width="2"/>
+    <text x="480" y="230" font-weight="bold" fill="#8e1550">Automated tests</text>
+    <text x="480" y="258" fill="#8e1550">Lint, pytest, DB check</text>
+
+    <rect x="860" y="190" width="360" height="100" rx="10" fill="#fbe4ec" stroke="#c2185b" stroke-width="2"/>
+    <text x="880" y="230" font-weight="bold" fill="#8e1550">Merge to main</text>
+    <text x="880" y="258" fill="#8e1550">All checks passed</text>
+
+    <rect x="1260" y="190" width="360" height="100" rx="10" fill="#fbe4ec" stroke="#c2185b" stroke-width="2"/>
+    <text x="1280" y="230" font-weight="bold" fill="#8e1550">Deploy to Azure VM</text>
+    <text x="1280" y="258" fill="#8e1550">SSH, docker compose up</text>
+  </g>
+
+  <!-- CI/CD connecting arrows -->
+  <line x1="420" y1="240" x2="455" y2="240" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="820" y1="240" x2="855" y2="240" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="1220" y1="240" x2="1255" y2="240" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Elbow from deploy box down into docker compose box -->
+  <polyline points="1440,290 1440,380 850,380 850,455" fill="none" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- WeatherStack API - external, mounted script, sits to the side -->
+  <rect x="130" y="575" width="300" height="105" rx="10" fill="#fdece4" stroke="#d2551e" stroke-width="2"/>
+  <text x="280" y="613" font-size="18" font-weight="bold" fill="#8a3010" text-anchor="middle">WeatherStack API</text>
+  <text x="280" y="637" font-size="13" fill="#8a3010" text-anchor="middle">Script mounted into Airflow</text>
+  <text x="280" y="655" font-size="13" fill="#8a3010" text-anchor="middle">(not a compose service)</text>
+  <line x1="430" y1="627" x2="540" y2="627" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Docker Compose dashed container -->
+  <rect x="470" y="470" width="760" height="838" rx="14" fill="#f1ece0" stroke="#999999" stroke-width="2" stroke-dasharray="6,5"/>
+  <text x="510" y="515" font-size="21" font-weight="bold" fill="#1a1a1a">Docker Compose — 5 services</text>
+  <text x="510" y="542" font-size="16" fill="#666666">Data pipeline, deployed by CI/CD</text>
+
+  <!-- Airflow -->
+  <rect x="550" y="575" width="600" height="105" rx="10" fill="#e3f0fc" stroke="#1565c0" stroke-width="2"/>
+  <text x="850" y="615" font-size="19" font-weight="bold" fill="#0d3f7a" text-anchor="middle">Airflow 3.0</text>
+  <text x="850" y="645" font-size="15" fill="#0d3f7a" text-anchor="middle">Orchestrates ingestion every 30 min</text>
+
+  <line x1="850" y1="680" x2="850" y2="720" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- PostgreSQL -->
+  <rect x="550" y="722" width="600" height="105" rx="10" fill="#e2f6ee" stroke="#1a8a5a" stroke-width="2"/>
+  <text x="850" y="762" font-size="19" font-weight="bold" fill="#0e5836" text-anchor="middle">PostgreSQL 14</text>
+  <text x="850" y="792" font-size="15" fill="#0e5836" text-anchor="middle">Stores raw and transformed data</text>
+
+  <line x1="850" y1="827" x2="850" y2="867" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- dbt -->
+  <rect x="550" y="869" width="600" height="105" rx="10" fill="#ece9fb" stroke="#5e43c7" stroke-width="2"/>
+  <text x="850" y="909" font-size="19" font-weight="bold" fill="#3a279c" text-anchor="middle">dbt 1.9</text>
+  <text x="850" y="939" font-size="15" fill="#3a279c" text-anchor="middle">Staging, intermediate and mart layers</text>
+
+  <line x1="850" y1="974" x2="850" y2="1014" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Redis -->
+  <rect x="550" y="1016" width="600" height="105" rx="10" fill="#fbe6e6" stroke="#c62828" stroke-width="2"/>
+  <text x="850" y="1056" font-size="19" font-weight="bold" fill="#8e1c1c" text-anchor="middle">Redis</text>
+  <text x="850" y="1086" font-size="15" fill="#8e1c1c" text-anchor="middle">Caches Superset query results</text>
+
+  <line x1="850" y1="1121" x2="850" y2="1161" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Superset -->
+  <rect x="550" y="1163" width="600" height="105" rx="10" fill="#fdedd3" stroke="#b8720c" stroke-width="2"/>
+  <text x="850" y="1203" font-size="19" font-weight="bold" fill="#7a4a08" text-anchor="middle">Apache Superset</text>
+  <text x="850" y="1233" font-size="15" fill="#7a4a08" text-anchor="middle">Live weather dashboards</text>
+
+  <!-- arrow out of docker compose box to Cloudflare Tunnel -->
+  <line x1="850" y1="1268" x2="850" y2="1330" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Cloudflare Tunnel - external, not a compose service -->
+  <rect x="550" y="1332" width="600" height="105" rx="10" fill="#f4f4f4" stroke="#666666" stroke-width="2"/>
+  <text x="850" y="1372" font-size="19" font-weight="bold" fill="#333333" text-anchor="middle">Cloudflare Tunnel</text>
+  <text x="850" y="1398" font-size="14" fill="#333333" text-anchor="middle">Secure public HTTPS access</text>
+  <text x="850" y="1420" font-size="13" fill="#666666" text-anchor="middle">(runs outside docker compose)</text>
+
+  <line x1="850" y1="1437" x2="850" y2="1497" stroke="#555555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Public access -->
+  <rect x="550" y="1499" width="600" height="105" rx="10" fill="#e8f4e3" stroke="#4a8c2a" stroke-width="2"/>
+  <text x="850" y="1539" font-size="19" font-weight="bold" fill="#2d5a1a" text-anchor="middle">Public access</text>
+  <text x="850" y="1569" font-size="15" fill="#2d5a1a" text-anchor="middle">superset.rainsunny.org (HTTPS)</text>
+
+  <text x="850" y="1665" font-size="15" fill="#999999" text-anchor="middle">github.com/Rainman4301/weather_ETL_pipeline</text>
+</svg>
